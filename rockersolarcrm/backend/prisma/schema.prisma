@@ -1,0 +1,33 @@
+// prisma/schema.prisma
+
+// Define your datasource here
+datasource db {
+  provider = "postgresql" // Use "sqlite" if you're using SQLite
+  url      = env("DATABASE_URL") // DATABASE_URL is defined in your .env file
+}
+
+// Define the User model
+model User {
+  id                String   @id @default(cuid())
+  name              String
+  email             String?  @unique
+  phone             String?  @unique
+  passwordHash     String
+  emailVerifiedAt  DateTime?
+  phoneVerifiedAt  DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// Define the Otp model
+model Otp {
+  id        String   @id @default(cuid())
+  target    String
+  type      String   // Can be "EMAIL" or "PHONE"
+  codeHash  String
+  expiresAt DateTime
+  consumed  Boolean  @default(false)
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
