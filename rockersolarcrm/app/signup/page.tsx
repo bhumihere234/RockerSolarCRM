@@ -1,325 +1,101 @@
-"use client"
+// app/signup/page.tsx
+"use client";
 
-import type React from "react"
-
-import { useState } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { ArrowLeft, User, Mail, Phone, Briefcase, Shield, Lock } from "lucide-react"
-
-const designations = ["SalesPerson", "HR", "Director", "Manager", "Team Lead", "Executive", "Administrator", "Analyst"]
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function SignupPage() {
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    mobile: "",
-    designation: "",
-    password: "",
-  })
-  const [otp, setOtp] = useState("")
-  const [otpSent, setOtpSent] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const router = useRouter()
+  const router = useRouter();
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    })
-  }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
 
-  const handleSendOtp = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    // Simulate sending OTP
-    setTimeout(() => {
-      setOtpSent(true)
-      setIsLoading(false)
-    }, 1000)
-  }
+    try {
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password }),
+      });
 
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    // Simulate OTP verification and account creation
-    setTimeout(() => {
-      setIsLoading(false)
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload?.error || "Signup failed");
 
-      // Store user designation in localStorage for dashboard routing
-      localStorage.setItem("userDesignation", formData.designation)
-      localStorage.setItem("userName", formData.name)
-      localStorage.setItem("userEmail", formData.email)
+      // Save token for authenticated API calls
+      localStorage.setItem("token", payload.token);
 
-      router.push("/dashboard")
-    }, 1500)
-  }
+      // (Optional) store user details
+      if (payload.user) {
+        localStorage.setItem("userName", payload.user.name ?? "");
+        localStorage.setItem("userEmail", payload.user.email ?? "");
+        localStorage.setItem("userDesignation", payload.user.designation ?? "Salesperson");
+      }
+
+      // Role/designation-based redirect
+      const role = (payload.user?.role || payload.user?.designation || "").toLowerCase();
+      if (role.includes("manager")) {
+        router.push("/dashboard/manager");
+      } else if (role.includes("general")) {
+        router.push("/dashboard/general");
+      } else {
+        // 🔹 Default: main dashboard (not salesperson)
+        router.push("/dashboard");
+      }
+    } catch (err: any) {
+      alert(err.message || "Error creating account");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: "#1F1F1E" }}>
-      <div className="w-full max-w-md">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <Link
-            href="/"
-            className="inline-flex items-center mb-6 transition-colors hover:opacity-80"
-            style={{ color: "#F16336" }}
-          >
-            <ArrowLeft size={20} className="mr-2" />
-            Back to Home
-          </Link>
-          <h1 className="text-3xl font-bold mb-2" style={{ color: "#F4F4F1" }}>
-            {otpSent ? "Verify Your Account" : "Create Account"}
-          </h1>
-          <p style={{ color: "#888886" }}>
-            {otpSent ? "Enter the OTP sent to your mobile number" : "Join RockerSolar CRM today"}
-          </p>
-        </div>
+    <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#f3f4f6" }}>
+      <form
+        onSubmit={handleSubmit}
+        className="w-full max-w-sm bg-white rounded-md shadow p-6 space-y-4"
+      >
+        <h1 className="text-lg font-semibold text-gray-900">Sign Up</h1>
 
-        {!otpSent ? (
-          /* Signup Form */
-          <form onSubmit={handleSendOtp} className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: "#D9D9D9" }}>
-                Full Name
-              </label>
-              <div className="relative">
-                <User
-                  size={20}
-                  className="absolute left-3 top-1/2 transform -translate-y-1/2"
-                  style={{ color: "#888886" }}
-                />
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  className="w-full pl-10 pr-4 py-3 rounded-lg border focus:outline-none focus:ring-2 transition-all"
-                  style={{
-                    backgroundColor: "#F4F4F1",
-                    borderColor: "#888886",
-                    color: "#1F1F1E",
-                  }}
-                  onFocus={(e) => (e.target.style.borderColor = "#F16336")}
-                  onBlur={(e) => (e.target.style.borderColor = "#888886")}
-                  placeholder="Enter your full name"
-                  required
-                />
-              </div>
-            </div>
+        <input
+          type="text"
+          placeholder="Full Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+          className="w-full border rounded px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-orange-300"
+        />
 
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: "#D9D9D9" }}>
-                Email Address
-              </label>
-              <div className="relative">
-                <Mail
-                  size={20}
-                  className="absolute left-3 top-1/2 transform -translate-y-1/2"
-                  style={{ color: "#888886" }}
-                />
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  className="w-full pl-10 pr-4 py-3 rounded-lg border focus:outline-none focus:ring-2 transition-all"
-                  style={{
-                    backgroundColor: "#F4F4F1",
-                    borderColor: "#888886",
-                    color: "#1F1F1E",
-                  }}
-                  onFocus={(e) => (e.target.style.borderColor = "#F16336")}
-                  onBlur={(e) => (e.target.style.borderColor = "#888886")}
-                  placeholder="Enter your email"
-                  required
-                />
-              </div>
-            </div>
+        <input
+          type="email"
+          placeholder="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          className="w-full border rounded px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-orange-300"
+        />
 
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: "#D9D9D9" }}>
-                Mobile Number
-              </label>
-              <div className="relative">
-                <Phone
-                  size={20}
-                  className="absolute left-3 top-1/2 transform -translate-y-1/2"
-                  style={{ color: "#888886" }}
-                />
-                <input
-                  type="tel"
-                  name="mobile"
-                  value={formData.mobile}
-                  onChange={handleInputChange}
-                  className="w-full pl-10 pr-4 py-3 rounded-lg border focus:outline-none focus:ring-2 transition-all"
-                  style={{
-                    backgroundColor: "#F4F4F1",
-                    borderColor: "#888886",
-                    color: "#1F1F1E",
-                  }}
-                  onFocus={(e) => (e.target.style.borderColor = "#F16336")}
-                  onBlur={(e) => (e.target.style.borderColor = "#888886")}
-                  placeholder="Enter your mobile number"
-                  required
-                />
-              </div>
-            </div>
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          className="w-full border rounded px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-orange-300"
+        />
 
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: "#D9D9D9" }}>
-                Password
-              </label>
-              <div className="relative">
-                <Lock
-                  size={20}
-                  className="absolute left-3 top-1/2 transform -translate-y-1/2"
-                  style={{ color: "#888886" }}
-                />
-                <input
-                  type="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  className="w-full pl-10 pr-4 py-3 rounded-lg border focus:outline-none focus:ring-2 transition-all"
-                  style={{
-                    backgroundColor: "#F4F4F1",
-                    borderColor: "#888886",
-                    color: "#1F1F1E",
-                  }}
-                  onFocus={(e) => (e.target.style.borderColor = "#F16336")}
-                  onBlur={(e) => (e.target.style.borderColor = "#888886")}
-                  placeholder="Create a password"
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: "#D9D9D9" }}>
-                Designation
-              </label>
-              <div className="relative">
-                <Briefcase
-                  size={20}
-                  className="absolute left-3 top-1/2 transform -translate-y-1/2"
-                  style={{ color: "#888886" }}
-                />
-                <select
-                  name="designation"
-                  value={formData.designation}
-                  onChange={handleInputChange}
-                  className="w-full pl-10 pr-4 py-3 rounded-lg border focus:outline-none focus:ring-2 transition-all appearance-none"
-                  style={{
-                    backgroundColor: "#F4F4F1",
-                    borderColor: "#888886",
-                    color: "#1F1F1E",
-                  }}
-                  onFocus={(e) => (e.target.style.borderColor = "#F16336")}
-                  onBlur={(e) => (e.target.style.borderColor = "#888886")}
-                  required
-                >
-                  <option value="">Select your designation</option>
-                  {designations.map((designation) => (
-                    <option key={designation} value={designation}>
-                      {designation}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full py-3 px-4 rounded-lg font-semibold transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{
-                backgroundColor: "#F16336",
-                color: "#FFFFFF",
-              }}
-            >
-              {isLoading ? "Sending OTP..." : "Send OTP"}
-            </button>
-          </form>
-        ) : (
-          /* OTP Verification Form */
-          <form onSubmit={handleVerifyOtp} className="space-y-6">
-            <div className="text-center mb-6">
-              <div
-                className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-4"
-                style={{ backgroundColor: "#F16336" }}
-              >
-                <Shield size={32} style={{ color: "#FFFFFF" }} />
-              </div>
-              <p style={{ color: "#888886" }}>We've sent a 6-digit verification code to</p>
-              <p className="font-semibold" style={{ color: "#F4F4F1" }}>
-                {formData.mobile}
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2" style={{ color: "#D9D9D9" }}>
-                Enter OTP
-              </label>
-              <input
-                type="text"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 transition-all text-center text-2xl tracking-widest"
-                style={{
-                  backgroundColor: "#F4F4F1",
-                  borderColor: "#888886",
-                  color: "#1F1F1E",
-                }}
-                onFocus={(e) => (e.target.style.borderColor = "#F16336")}
-                onBlur={(e) => (e.target.style.borderColor = "#888886")}
-                placeholder="000000"
-                maxLength={6}
-                required
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full py-3 px-4 rounded-lg font-semibold transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{
-                backgroundColor: "#F16336",
-                color: "#FFFFFF",
-              }}
-            >
-              {isLoading ? "Creating Account..." : "Verify & Create Account"}
-            </button>
-
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={() => setOtpSent(false)}
-                className="text-sm hover:underline transition-colors"
-                style={{ color: "#888886" }}
-              >
-                Didn't receive OTP? Resend
-              </button>
-            </div>
-          </form>
-        )}
-
-        {/* Login Link */}
-        {!otpSent && (
-          <div className="text-center mt-8">
-            <p style={{ color: "#888886" }}>
-              Already have an account?{" "}
-              <Link
-                href="/login"
-                className="font-semibold hover:underline transition-colors"
-                style={{ color: "#F16336" }}
-              >
-                Sign in here
-              </Link>
-            </p>
-          </div>
-        )}
-      </div>
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full rounded text-white py-2 text-sm font-medium disabled:opacity-60"
+          style={{ backgroundColor: "#F16336" }}
+        >
+          {loading ? "Creating account..." : "Sign Up"}
+        </button>
+      </form>
     </div>
-  )
+  );
 }

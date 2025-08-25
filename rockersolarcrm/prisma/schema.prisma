@@ -1,0 +1,90 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"                 
+  url      = env("DATABASE_URL")     
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  phone     String?
+  password  String
+  role      String   @default("salesperson")
+  leads     Lead[]
+  dashboard Dashboard?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Lead {
+  id                     String   @id @default(cuid())
+
+  // Who this lead belongs to
+  userId                 String
+  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Personal / contact
+  name                   String
+  email                  String
+  phone                  String
+  alternatePhone         String?  // optional
+
+  // Address
+  address                String
+  city                   String
+  state                  String
+  pincode                String
+
+  // Professional
+  company                String?
+  designation            String?
+
+  // Solar requirements
+  roofArea               String?
+  monthlyBill            String?
+  energyRequirement      String?
+  roofType               String?
+  propertyType           String?
+
+  // Lead info
+  leadSource             String?
+  budget                 String?
+  timeline               String?
+  priority               String  @default("medium")
+  notes                  String?
+
+  // Follow-up
+  preferredContactTime   String?
+  preferredContactMethod String?  // "phone" | "whatsapp" | "email"
+  nextFollowUpDate       DateTime?
+
+  // Timestamps
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  @@index([userId, name])
+  @@index([userId, email])
+  @@index([userId, phone])
+  @@index([userId, city])
+  @@index([userId, company])
+
+}
+
+
+model Dashboard {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  totalLeads       Int      @default(0)
+  overdueCount     Int      @default(0)
+  followupCount    Int      @default(0)
+  wonCount         Int      @default(0)
+  newLeads         Int      @default(0)  // Add this field
+  lastCalculatedAt DateTime @default(now())
+}
+
+

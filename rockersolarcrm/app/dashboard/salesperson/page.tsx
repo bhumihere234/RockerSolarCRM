@@ -15,6 +15,8 @@ import {
   UserX,
   Search,
 } from "lucide-react"
+
+// ✅ Only these three local components are used
 import CustomerListModal from "./components/customer-list-modal"
 import AbsenceModal from "./components/absence-modal"
 import SearchModal from "./components/search-modal"
@@ -222,7 +224,6 @@ export default function SalespersonDashboard() {
   ]
 
   const handleKPIClick = (type: string, title: string) => {
-    console.log("KPI clicked:", type, title)
     setSelectedKPI(type)
     setShowCustomerList(true)
   }
@@ -245,9 +246,6 @@ export default function SalespersonDashboard() {
 
     // Simulate sending notification to manager
     console.log("Absence notification sent to manager:", absenceRequest)
-
-    // In a real app, this would be an API call to notify the manager
-    // sendAbsenceNotification(absenceRequest)
   }
 
   const getCurrentDate = () => {
