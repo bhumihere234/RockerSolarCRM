@@ -3,6 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { verifyToken } from "@/utils/auth";
 import { z } from "zod";
 
+const IST = "Asia/Kolkata";
+
+/* ----------------------------- Validation ----------------------------- */
+
 const leadSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
@@ -20,94 +24,215 @@ const leadSchema = z.object({
   roofType: z.string().optional().nullable(),
   propertyType: z.string().optional().nullable(),
   leadSource: z.string().optional().nullable(),
-  budget: z.string().optional().nullable(),
-  timeline: z.string().optional().nullable(),
-  priority: z.enum(["high", "medium", "low"]).default("medium"),
-  notes: z.string().optional().nullable(),
-  preferredContactTime: z.string().optional().nullable(),
-  preferredContactMethod: z.string().optional().nullable(),
-  nextFollowUpDate: z.string().optional().nullable(),
+  budget: z.coerce.number().optional().nullable()
 });
 
-export async function POST(req: Request) {
-  try {
-    console.log("Received a request to create a new lead.");  // Log before processing
+const listQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(200).default(20),
+  q: z.string().trim().optional(),
+  status: z.enum(["OPEN", "INPROCESS", "WON", "LOST"]).optional(),
+  dateFrom: z.string().datetime().optional(), // ISO string
+  dateTo: z.string().datetime().optional(),   // ISO string
+  sort: z.enum(["createdAt", "name"]).default("createdAt"),
+  order: z.enum(["asc", "desc"]).default("desc"),
+  includeKpis: z.coerce.boolean().default(false),
+});
 
-    // Extract token and verify user
-    const token = req.headers.get("authorization")?.split(" ")[1];
-    const auth = token ? verifyToken(token) : null;
-    
-    if (!auth) {
-      console.log("Unauthorized user attempted to submit the lead.");
+/* ----------------------------- Time Helpers ---------------------------- */
+
+function istRangeForToday() {
+  const now = new Date();
+  const istNow = utcToZonedTime(now, IST);
+  const start = zonedTimeToUtc(startOfDay(istNow), IST);
+  const end = zonedTimeToUtc(endOfDay(istNow), IST);
+  return { start, end };
+}
+
+function istRangeForThisWeek() {
+  const now = new Date();
+  const istNow = utcToZonedTime(now, IST);
+  const start = zonedTimeToUtc(startOfWeek(istNow, { weekStartsOn: 1 }), IST); // Monday
+  const end = zonedTimeToUtc(endOfWeek(istNow, { weekStartsOn: 1 }), IST);
+  return { start, end };
+}
+
+async function computeKPIs(userOrgId?: string) {
+  const whereOrg = userOrgId ? { orgId: userOrgId } : {};
+
+  const { start: todayStart, end: todayEnd } = istRangeForToday();
+  const { start: weekStart, end: weekEnd } = istRangeForThisWeek();
+
+  const [totalLeads, leadsToday, leadsThisWeek, openLeads, wonLeads] =
+    await Promise.all([
+      prisma.lead.count({ where: { ...whereOrg } }),
+      prisma.lead.count({
+        where: { ...whereOrg, createdAt: { gte: todayStart, lte: todayEnd } }
+      }),
+      prisma.lead.count({
+        where: { ...whereOrg, createdAt: { gte: weekStart, lte: weekEnd } }
+      }),
+      prisma.lead.count({ where: { ...whereOrg, status: "OPEN" } }),
+      prisma.lead.count({ where: { ...whereOrg, status: "WON" } })
+    ]);
+
+  const conversionRate =
+    totalLeads === 0 ? 0 : Number(((wonLeads / totalLeads) * 100).toFixed(1));
+
+  return {
+    totalLeads,
+    leadsToday,
+    leadsThisWeek,
+    openLeads,
+    wonLeads,
+    conversionRate
+  };
+}
+
+/* --------------------------------- GET --------------------------------- */
+/**
+ * List leads for the Lead List page:
+ *   /api/leads?page=1&pageSize=20&q=delhi&status=OPEN&sort=createdAt&order=desc&includeKpis=1
+ */
+export async function GET(req: Request) {
+  try {
+    const auth = await verifyToken(req);
+    if (!auth?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Parse and validate the incoming request data
-    const parsed = leadSchema.safeParse(await req.json());
-    if (!parsed.success) {
-      console.log("Validation failed:", parsed.error.format()); // Log validation errors
-      return NextResponse.json(
-        { error: "Invalid input", details: parsed.error.format() },
-        { status: 400 }
-      );
+    const url = new URL(req.url);
+    const parsed = listQuerySchema.parse(Object.fromEntries(url.searchParams));
+
+    const { page, pageSize, q, status, dateFrom, dateTo, sort, order, includeKpis } = parsed;
+    const skip = (page - 1) * pageSize;
+
+    const where: any = { orgId: auth.user.orgId };
+
+    // Status filter
+    if (status) where.status = status;
+
+    // Search filter (case-insensitive)
+    if (q && q.length > 0) {
+      where.OR = [
+        { name: { contains: q, mode: "insensitive" } },
+        { email: { contains: q, mode: "insensitive" } },
+        { phone: { contains: q, mode: "insensitive" } },
+        { city: { contains: q, mode: "insensitive" } },
+        { state: { contains: q, mode: "insensitive" } },
+        { company: { contains: q, mode: "insensitive" } },
+      ];
     }
 
-    const b = parsed.data;
+    // Date range filter (interpret input as IST day bounds)
+    if (dateFrom || dateTo) {
+      const istStart = dateFrom
+        ? zonedTimeToUtc(startOfDay(utcToZonedTime(parseISO(dateFrom), IST)), IST)
+        : undefined;
+      const istEnd = dateTo
+        ? zonedTimeToUtc(endOfDay(utcToZonedTime(parseISO(dateTo), IST)), IST)
+        : undefined;
 
-    // Log the validated lead data
-    console.log("Validated lead data:", b);
+      where.createdAt = {
+        ...(istStart ? { gte: istStart } : {}),
+        ...(istEnd ? { lte: istEnd } : {}),
+      };
+    }
 
-    // Create the lead
-    const lead = await prisma.lead.create({
-      data: {
-        name: b.name,
-        email: b.email,
-        phone: b.phone,
-        alternatePhone: b.alternatePhone ?? null,
-        address: b.address,
-        city: b.city,
-        state: b.state,
-        pincode: b.pincode,
-        company: b.company ?? null,
-        designation: b.designation ?? null,
-        roofArea: b.roofArea ?? null,
-        monthlyBill: b.monthlyBill ?? null,
-        energyRequirement: b.energyRequirement ?? null,
-        roofType: b.roofType ?? null,
-        propertyType: b.propertyType ?? null,
-        leadSource: b.leadSource ?? null,
-        budget: b.budget ?? null,
-        timeline: b.timeline ?? null,
-        priority: b.priority,
-        notes: b.notes ?? null,
-        preferredContactTime: b.preferredContactTime ?? null,
-        preferredContactMethod: b.preferredContactMethod ?? null,
-        nextFollowUpDate: b.nextFollowUpDate ? new Date(b.nextFollowUpDate) : null,
-        userId: auth.id, // Associate lead with the logged-in user
-      },
-    });
-
-    console.log("Lead created successfully:", lead);
-
-    // Update the dashboard KPI for the logged-in user
-    const dashboard = await prisma.dashboard.upsert({
-      where: { userId: auth.id },
-      update: {
-        newLeads: {
-          increment: 1, // Increment the newLeads KPI by 1
+    const [items, total] = await Promise.all([
+      prisma.lead.findMany({
+        where,
+        skip,
+        take: pageSize,
+        orderBy: { [sort]: order },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          city: true,
+          state: true,
+          company: true,
+          status: true,
+          createdAt: true,
         },
+      }),
+      prisma.lead.count({ where }),
+    ]);
+
+    const base = {
+      data: items,
+      pageInfo: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.ceil(total / pageSize),
       },
-      create: {
-        userId: auth.id,
-        newLeads: 1, // Initialize newLeads if this is the first lead for the user
-      },
+    } as any;
+
+    if (includeKpis) {
+      base.kpis = await computeKPIs(auth.user.orgId);
+    }
+
+    return NextResponse.json(base);
+  } catch (err: any) {
+    console.error("List leads failed:", err);
+    return NextResponse.json(
+      { error: err?.message ?? "Failed to list leads" },
+      { status: 400 }
+    );
+  }
+}
+
+/* --------------------------------- POST -------------------------------- */
+export async function POST(req: Request) {
+  try {
+    const auth = await verifyToken(req);
+    if (!auth?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const data = leadSchema.parse(body);
+
+    // wrap in a transaction: create lead then recompute KPIs atomically
+    const result = await prisma.$transaction(async (tx) => {
+      const lead = await tx.lead.create({
+        data: {
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
+          alternatePhone: data.alternatePhone ?? null,
+          address: data.address,
+          city: data.city,
+          state: data.state,
+          pincode: data.pincode,
+          company: data.company ?? null,
+          designation: data.designation ?? null,
+          roofArea: data.roofArea ?? null,
+          monthlyBill: data.monthlyBill ?? null,
+          energyRequirement: data.energyRequirement ?? null,
+          roofType: data.roofType ?? null,
+          propertyType: data.propertyType ?? null,
+          leadSource: data.leadSource ?? null,
+          budget: data.budget ?? null,
+          status: "OPEN",
+          createdById: auth.user.id,
+          orgId: auth.user.orgId // make sure your model has this if you multi-tenant
+        }
+      });
+
+      // compute KPIs using the same connection for consistency
+      const kpis = await computeKPIs(auth.user.orgId);
+      return { lead, kpis };
     });
 
-    console.log("Updated Dashboard after new lead:", dashboard);
-
-    return NextResponse.json({ id: lead.id, lead }, { status: 201 });
+    return NextResponse.json(result, { status: 201 });
   } catch (err: any) {
-    console.error("POST /api/leads error:", err);  // Log the error
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+    console.error("Create lead failed:", err);
+    return NextResponse.json(
+      { error: err?.message ?? "Failed to create lead" },
+      { status: 400 }
+    );
   }
 }
