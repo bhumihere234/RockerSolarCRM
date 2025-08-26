@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyToken } from "@/utils/auth";
+import { getUserFromAuthHeader } from "@/utils/auth";
 import { z } from "zod";
 
 /* ------------------------------------------------------------------ */
@@ -31,9 +31,10 @@ const listQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(200).default(20),
   q: z.string().trim().optional(),
-  status: z.enum(["OPEN", "INPROCESS", "WON", "LOST"]).optional(),
-  dateFrom: z.string().optional(), // ISO string (we’ll treat as IST day)
-  dateTo: z.string().optional(),   // ISO string
+  // accept any string; we'll normalize to enum later
+  status: z.string().optional(),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
   sort: z.enum(["createdAt", "name"]).default("createdAt"),
   order: z.enum(["asc", "desc"]).default("desc"),
   includeKpis: z.coerce.boolean().default(false),
@@ -43,115 +44,77 @@ const listQuerySchema = z.object({
 /*                        Plain-JS IST Time Helpers                    */
 /* ------------------------------------------------------------------ */
 
-// +05:30 in minutes
 const IST_OFFSET_MIN = 5 * 60 + 30;
-
-/** Convert an IST date-time to UTC date-time (for storing/querying). */
-function toUtcFromIst(ist: Date) {
-  return new Date(ist.getTime() - IST_OFFSET_MIN * 60_000);
-}
-
-/** Now in IST. */
-function nowIst() {
-  const n = new Date();
-  return new Date(n.getTime() + IST_OFFSET_MIN * 60_000);
-}
-
-/** Start of the day in IST for a given IST date. */
-function startOfIstDay(d: Date) {
-  const ist = new Date(d);
-  ist.setHours(0, 0, 0, 0);
-  return ist;
-}
-
-/** End of the day in IST for a given IST date. */
-function endOfIstDay(d: Date) {
-  const ist = new Date(d);
-  ist.setHours(23, 59, 59, 999);
-  return ist;
-}
-
-/** Monday-start week range in IST, returned as UTC. */
+function toUtcFromIst(ist: Date) { return new Date(ist.getTime() - IST_OFFSET_MIN * 60_000); }
+function nowIst() { const n = new Date(); return new Date(n.getTime() + IST_OFFSET_MIN * 60_000); }
+function startOfIstDay(d: Date) { const ist = new Date(d); ist.setHours(0,0,0,0); return ist; }
+function endOfIstDay(d: Date) { const ist = new Date(d); ist.setHours(23,59,59,999); return ist; }
 function istRangeForThisWeek() {
   const istNow = nowIst();
-  // Find Monday (0..6 with Monday=0)
-  const dow = (istNow.getDay() + 6) % 7;
-  const startIst = new Date(istNow);
-  startIst.setDate(startIst.getDate() - dow);
-  startIst.setHours(0, 0, 0, 0);
-
-  const endIst = new Date(startIst);
-  endIst.setDate(startIst.getDate() + 6);
-  endIst.setHours(23, 59, 59, 999);
-
+  const dow = (istNow.getDay() + 6) % 7; // Monday=0
+  const startIst = new Date(istNow); startIst.setDate(startIst.getDate() - dow); startIst.setHours(0,0,0,0);
+  const endIst = new Date(startIst); endIst.setDate(startIst.getDate() + 6); endIst.setHours(23,59,59,999);
   return { start: toUtcFromIst(startIst), end: toUtcFromIst(endIst) };
 }
-
-/** Today’s IST day bounds, returned as UTC. */
 function istRangeForToday() {
   const istNow = nowIst();
-  return {
-    start: toUtcFromIst(startOfIstDay(istNow)),
-    end: toUtcFromIst(endOfIstDay(istNow)),
-  };
+  return { start: toUtcFromIst(startOfIstDay(istNow)), end: toUtcFromIst(endOfIstDay(istNow)) };
 }
 
 /* ------------------------------------------------------------------ */
 /*                               KPIs                                  */
 /* ------------------------------------------------------------------ */
 
-async function computeKPIs(userOrgId?: string) {
-  const whereOrg = userOrgId ? { orgId: userOrgId } : {};
-
+export async function computeKPIs(userId?: string) {
+  const whereUser = userId ? { userId } : {};
   const { start: todayStart, end: todayEnd } = istRangeForToday();
   const { start: weekStart, end: weekEnd } = istRangeForThisWeek();
 
-  const [totalLeads, leadsToday, leadsThisWeek, openLeads, wonLeads] =
-    await Promise.all([
-      prisma.lead.count({ where: { ...whereOrg } }),
-      prisma.lead.count({
-        where: { ...whereOrg, createdAt: { gte: todayStart, lte: todayEnd } },
-      }),
-      prisma.lead.count({
-        where: { ...whereOrg, createdAt: { gte: weekStart, lte: weekEnd } },
-      }),
-      prisma.lead.count({ where: { ...whereOrg, status: "OPEN" } }),
-      prisma.lead.count({ where: { ...whereOrg, status: "WON" } }),
-    ]);
+  const [totalLeads, leadsToday, leadsThisWeek] = await Promise.all([
+    prisma.lead.count({ where: { ...whereUser } }),
+    prisma.lead.count({ where: { ...whereUser, createdAt: { gte: todayStart, lte: todayEnd } } }),
+    prisma.lead.count({ where: { ...whereUser, createdAt: { gte: weekStart, lte: weekEnd } } }),
+  ]);
+  // No status field in schema, so skip openLeads/wonLeads
+  const openLeads = 0;
+  const wonLeads = 0;
 
-  const conversionRate =
-    totalLeads === 0 ? 0 : Number(((wonLeads / totalLeads) * 100).toFixed(1));
+  const conversionRate = totalLeads === 0 ? 0 : Number(((wonLeads / totalLeads) * 100).toFixed(1));
+  return { totalLeads, leadsToday, leadsThisWeek, openLeads, wonLeads, conversionRate };
+}
 
-  return {
-    totalLeads,
-    leadsToday,
-    leadsThisWeek,
-    openLeads,
-    wonLeads,
-    conversionRate,
+/* ------------------------------------------------------------------ */
+/*                             Normalizers                             */
+/* ------------------------------------------------------------------ */
+
+function normalizeStatus(s?: string): "OPEN" | "INPROCESS" | "WON" | "LOST" | undefined {
+  if (!s) return undefined;
+  const v = s.trim().toUpperCase();
+  if (["OPEN", "INPROCESS", "WON", "LOST"].includes(v)) return v as any;
+  const map: Record<string, "OPEN"|"INPROCESS"|"WON"|"LOST"> = {
+    "NEW LEAD": "OPEN",
+    "OVERDUE": "INPROCESS",
+    "FOLLOW UP": "INPROCESS",
+    "CLOSED": "WON", // change to "LOST" if that's how you use Closed
+    "LOST": "LOST",
   };
+  return map[v];
 }
 
 /* ------------------------------------------------------------------ */
 /*                                 GET                                 */
-/*     List leads with search / filters / pagination / sorting         */
 /* ------------------------------------------------------------------ */
 
 export async function GET(req: Request) {
   try {
-    const auth = await verifyToken(req);
-    if (!auth?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = getUserFromAuthHeader(req);
+    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const url = new URL(req.url);
     const parsed = listQuerySchema.parse(Object.fromEntries(url.searchParams));
-    const { page, pageSize, q, status, dateFrom, dateTo, sort, order, includeKpis } =
-      parsed;
+    const { page, pageSize, q, dateFrom, dateTo, sort, order, includeKpis } = parsed;
 
-    const where: any = { orgId: auth.user.orgId };
-
-    if (status) where.status = status;
+    const where: any = { userId: auth.id };
 
     if (q && q.trim().length) {
       where.OR = [
@@ -164,9 +127,7 @@ export async function GET(req: Request) {
       ];
     }
 
-    // Date filter (treat the incoming timestamps as “dates for IST day”)
     if (dateFrom || dateTo) {
-      // parse ISO safely; if invalid, ignore
       const fromUtc =
         dateFrom && !Number.isNaN(new Date(dateFrom).getTime())
           ? toUtcFromIst(startOfIstDay(new Date(dateFrom)))
@@ -177,31 +138,23 @@ export async function GET(req: Request) {
           : undefined;
 
       if (fromUtc || toUtcVal) {
-        where.createdAt = {
-          ...(fromUtc ? { gte: fromUtc } : {}),
-          ...(toUtcVal ? { lte: toUtcVal } : {}),
-        };
+        where.createdAt = { ...(fromUtc ? { gte: fromUtc } : {}), ...(toUtcVal ? { lte: toUtcVal } : {}) };
       }
     }
 
     const skip = (page - 1) * pageSize;
+    const sortKey = sort === "name" ? "name" : "createdAt";
+    const sortOrder: "asc" | "desc" = order === "asc" ? "asc" : "desc";
 
     const [items, total] = await Promise.all([
       prisma.lead.findMany({
         where,
         skip,
         take: pageSize,
-        orderBy: { [sort]: order },
+        orderBy: { [sortKey]: sortOrder },
         select: {
-          id: true,
-          name: true,
-          email: true,
-          phone: true,
-          city: true,
-          state: true,
-          company: true,
-          status: true,
-          createdAt: true,
+          id: true, name: true, email: true, phone: true,
+          city: true, state: true, company: true, createdAt: true,
         },
       }),
       prisma.lead.count({ where }),
@@ -209,39 +162,26 @@ export async function GET(req: Request) {
 
     const response: any = {
       data: items,
-      pageInfo: {
-        page,
-        pageSize,
-        total,
-        totalPages: Math.ceil(total / pageSize),
-      },
+      pageInfo: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
     };
 
-    if (includeKpis) {
-      response.kpis = await computeKPIs(auth.user.orgId);
-    }
+    if (includeKpis) response.kpis = await computeKPIs(auth.id);
 
     return NextResponse.json(response);
   } catch (err: any) {
     console.error("List leads failed:", err);
-    return NextResponse.json(
-      { error: err?.message ?? "Failed to list leads" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: err?.message ?? "Failed to list leads" }, { status: 400 });
   }
 }
 
 /* ------------------------------------------------------------------ */
 /*                                 POST                                */
-/*            Create a lead and return fresh KPIs atomically           */
 /* ------------------------------------------------------------------ */
 
 export async function POST(req: Request) {
   try {
-    const auth = await verifyToken(req);
-    if (!auth?.user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const auth = getUserFromAuthHeader(req);
+    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const body = await req.json();
     const data = leadSchema.parse(body);
@@ -259,29 +199,24 @@ export async function POST(req: Request) {
           pincode: data.pincode,
           company: data.company ?? null,
           designation: data.designation ?? null,
-          roofArea: data.roofArea ?? null,
-          monthlyBill: data.monthlyBill ?? null,
-          energyRequirement: data.energyRequirement ?? null,
+          roofArea: data.roofArea != null ? String(data.roofArea) : null,
+          monthlyBill: data.monthlyBill != null ? String(data.monthlyBill) : null,
+          energyRequirement: data.energyRequirement != null ? String(data.energyRequirement) : null,
           roofType: data.roofType ?? null,
           propertyType: data.propertyType ?? null,
           leadSource: data.leadSource ?? null,
-          budget: data.budget ?? null,
-          status: "OPEN",
-          createdById: auth.user.id,
-          orgId: auth.user.orgId, // multi-tenant guard
+          budget: data.budget != null ? String(data.budget) : null,
+          userId: auth.id,
         },
       });
 
-      const kpis = await computeKPIs(auth.user.orgId);
+      const kpis = await computeKPIs(auth.id);
       return { lead, kpis };
     });
 
     return NextResponse.json(result, { status: 201 });
   } catch (err: any) {
     console.error("Create lead failed:", err);
-    return NextResponse.json(
-      { error: err?.message ?? "Failed to create lead" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: err?.message ?? "Failed to create lead" }, { status: 400 });
   }
 }
