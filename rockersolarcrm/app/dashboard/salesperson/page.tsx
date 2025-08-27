@@ -233,7 +233,7 @@ function SalespersonDashboardInner() {
       <header className="p-6 border-b" style={{ background: `linear-gradient(135deg, #1F1F1E 0%, #2A2A28 100%)`, borderColor: "#888886" }}>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold" style={{ color: "#F4F4F1" }}>Salesperson Dashboard</h1>
+            <h1 className="text-3xl font-bold" style={{ color: "#F4F4F1" }}>Welcome Back!</h1>
             <p style={{ color: "#888886" }}>Track your leads and manage customer relationships</p>
             <p className="text-sm mt-1" style={{ color: "#D9D9D9" }}>{getCurrentDate()}</p>
           </div>
@@ -256,6 +256,25 @@ function SalespersonDashboardInner() {
               </div>
               <span style={{ color: "#D9D9D9" }}>Sales Person</span>
             </div>
+            {/* Logout Button */}
+            <button
+              onClick={() => {
+                if (window.confirm('Are you sure you want to logout?')) {
+                  // Remove token from localStorage
+                  if (typeof window !== 'undefined') {
+                    localStorage.removeItem('token');
+                  }
+                  // Remove cookie (if using cookies for session)
+                  document.cookie = 'rs_session=; Max-Age=0; path=/;';
+                  // Redirect to login page
+                  window.location.href = '/login';
+                }
+              }}
+              className="px-4 py-2 rounded-lg font-medium transition-all hover:scale-105 border bg-[#F16336] text-white border-[#F16336] ml-2"
+              title="Logout"
+            >
+              Logout
+            </button>
           </div>
         </div>
       </header>

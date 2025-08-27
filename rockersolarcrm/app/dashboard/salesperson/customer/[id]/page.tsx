@@ -305,11 +305,11 @@ export default function CustomerProfilePage() {
                 className="px-3 py-2 rounded bg-gray-100 border border-gray-300 text-xs font-semibold hover:bg-orange-100"
                 onClick={() => setDropdownOpen((v) => !v)}
               >
-                Change KPI
+                update progress
               </button>
               {dropdownOpen && (
                 <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-30 p-3">
-                  <div className="mb-2 font-bold text-xs text-gray-700">Call Status</div>
+                  <div className="mb-2 font-bold text-xs text-blue-700 uppercase tracking-wide">Call Status</div>
                   {CALL_STATUS_OPTIONS.map(opt => (
                     <label key={opt.value} className="flex items-center mb-1 cursor-pointer text-sm">
                       <input
@@ -323,7 +323,7 @@ export default function CustomerProfilePage() {
                       {opt.label}
                     </label>
                   ))}
-                  <div className="mt-3 mb-2 font-bold text-xs text-gray-700">Lead Progress</div>
+                  <div className="mt-3 mb-2 font-bold text-xs text-blue-700 uppercase tracking-wide">Lead Progress</div>
                   {LEAD_PROGRESS_OPTIONS.map(opt => (
                     <label key={opt.value} className="flex items-center mb-1 cursor-pointer text-sm">
                       <input
