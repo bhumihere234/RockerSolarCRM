@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyToken } from "@/utils/auth";
+import { getUserFromAuthHeader } from "@/utils/auth";
+import { parseISO, startOfDay, endOfDay } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
 import { z } from "zod";
+import { computeKPIs } from "./[id]/route";
 
 const IST = "Asia/Kolkata";
-
-/* ----------------------------- Validation ----------------------------- */
 
 const leadSchema = z.object({
   name: z.string().min(1),
@@ -24,7 +25,8 @@ const leadSchema = z.object({
   roofType: z.string().optional().nullable(),
   propertyType: z.string().optional().nullable(),
   leadSource: z.string().optional().nullable(),
-  budget: z.coerce.number().optional().nullable()
+  budget: z.coerce.number().optional().nullable(),
+  leadStatus: z.string().optional(),
 });
 
 const listQuerySchema = z.object({
@@ -39,78 +41,25 @@ const listQuerySchema = z.object({
   includeKpis: z.coerce.boolean().default(false),
 });
 
-/* ----------------------------- Time Helpers ---------------------------- */
-
 function istRangeForToday() {
   const now = new Date();
-  const istNow = utcToZonedTime(now, IST);
-  const start = zonedTimeToUtc(startOfDay(istNow), IST);
-  const end = zonedTimeToUtc(endOfDay(istNow), IST);
+  const istNow = toZonedTime(now, IST);
+  const start = startOfDay(istNow);
+  const end = endOfDay(istNow);
   return { start, end };
 }
-
-function istRangeForThisWeek() {
-  const now = new Date();
-  const istNow = utcToZonedTime(now, IST);
-  const start = zonedTimeToUtc(startOfWeek(istNow, { weekStartsOn: 1 }), IST); // Monday
-  const end = zonedTimeToUtc(endOfWeek(istNow, { weekStartsOn: 1 }), IST);
-  return { start, end };
-}
-
-async function computeKPIs(userOrgId?: string) {
-  const whereOrg = userOrgId ? { orgId: userOrgId } : {};
-
-  const { start: todayStart, end: todayEnd } = istRangeForToday();
-  const { start: weekStart, end: weekEnd } = istRangeForThisWeek();
-
-  const [totalLeads, leadsToday, leadsThisWeek, openLeads, wonLeads] =
-    await Promise.all([
-      prisma.lead.count({ where: { ...whereOrg } }),
-      prisma.lead.count({
-        where: { ...whereOrg, createdAt: { gte: todayStart, lte: todayEnd } }
-      }),
-      prisma.lead.count({
-        where: { ...whereOrg, createdAt: { gte: weekStart, lte: weekEnd } }
-      }),
-      prisma.lead.count({ where: { ...whereOrg, status: "OPEN" } }),
-      prisma.lead.count({ where: { ...whereOrg, status: "WON" } })
-    ]);
-
-  const conversionRate =
-    totalLeads === 0 ? 0 : Number(((wonLeads / totalLeads) * 100).toFixed(1));
-
-  return {
-    totalLeads,
-    leadsToday,
-    leadsThisWeek,
-    openLeads,
-    wonLeads,
-    conversionRate
-  };
-}
-
-/* --------------------------------- GET --------------------------------- */
-/**
- * List leads for the Lead List page:
- *   /api/leads?page=1&pageSize=20&q=delhi&status=OPEN&sort=createdAt&order=desc&includeKpis=1
- */
 export async function GET(req: Request) {
   try {
-    const auth = await verifyToken(req);
-    if (!auth?.user) {
+    const auth = getUserFromAuthHeader(req);
+    if (!auth) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const url = new URL(req.url);
     const parsed = listQuerySchema.parse(Object.fromEntries(url.searchParams));
-
-    const { page, pageSize, q, status, dateFrom, dateTo, sort, order, includeKpis } = parsed;
+    const { page, pageSize, q, dateFrom, dateTo, sort, order, includeKpis } = parsed;
     const skip = (page - 1) * pageSize;
-
-    const where: any = { orgId: auth.user.orgId };
-
-    // Status filter
-    if (status) where.status = status;
+    const where: any = { userId: auth.id };
 
     // Search filter (case-insensitive)
     if (q && q.length > 0) {
@@ -127,10 +76,10 @@ export async function GET(req: Request) {
     // Date range filter (interpret input as IST day bounds)
     if (dateFrom || dateTo) {
       const istStart = dateFrom
-        ? zonedTimeToUtc(startOfDay(utcToZonedTime(parseISO(dateFrom), IST)), IST)
+        ? startOfDay(toZonedTime(parseISO(dateFrom), IST))
         : undefined;
       const istEnd = dateTo
-        ? zonedTimeToUtc(endOfDay(utcToZonedTime(parseISO(dateTo), IST)), IST)
+        ? endOfDay(toZonedTime(parseISO(dateTo), IST))
         : undefined;
 
       where.createdAt = {
@@ -153,14 +102,15 @@ export async function GET(req: Request) {
           city: true,
           state: true,
           company: true,
-          status: true,
           createdAt: true,
+          leadStatus: true,
+          callStatus: true,
         },
       }),
       prisma.lead.count({ where }),
     ]);
 
-    const base = {
+    const base: any = {
       data: items,
       pageInfo: {
         page,
@@ -168,10 +118,11 @@ export async function GET(req: Request) {
         total,
         totalPages: Math.ceil(total / pageSize),
       },
-    } as any;
+    };
 
-    if (includeKpis) {
-      base.kpis = await computeKPIs(auth.user.orgId);
+    // Optionally add KPIs if requested and function exists
+    if (includeKpis && typeof computeKPIs === 'function') {
+      base.kpis = await computeKPIs(auth.id);
     }
 
     return NextResponse.json(base);
@@ -183,12 +134,10 @@ export async function GET(req: Request) {
     );
   }
 }
-
-/* --------------------------------- POST -------------------------------- */
 export async function POST(req: Request) {
   try {
-    const auth = await verifyToken(req);
-    if (!auth?.user) {
+    const auth = getUserFromAuthHeader(req);
+    if (!auth) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -209,21 +158,30 @@ export async function POST(req: Request) {
           pincode: data.pincode,
           company: data.company ?? null,
           designation: data.designation ?? null,
-          roofArea: data.roofArea ?? null,
-          monthlyBill: data.monthlyBill ?? null,
-          energyRequirement: data.energyRequirement ?? null,
+          roofArea: data.roofArea !== undefined && data.roofArea !== null ? String(data.roofArea) : null,
+          monthlyBill: data.monthlyBill !== undefined && data.monthlyBill !== null ? String(data.monthlyBill) : null,
+          energyRequirement: data.energyRequirement !== undefined && data.energyRequirement !== null ? String(data.energyRequirement) : null,
           roofType: data.roofType ?? null,
           propertyType: data.propertyType ?? null,
           leadSource: data.leadSource ?? null,
-          budget: data.budget ?? null,
-          status: "OPEN",
-          createdById: auth.user.id,
-          orgId: auth.user.orgId // make sure your model has this if you multi-tenant
+          budget: data.budget !== undefined && data.budget !== null ? String(data.budget) : null,
+          timeline: data.timeline ?? null,
+          priority: data.priority ?? "medium",
+          notes: data.notes ?? null,
+          preferredContactTime: data.preferredContactTime ?? null,
+          preferredContactMethod: data.preferredContactMethod ?? null,
+          nextFollowUpDate: data.nextFollowUpDate ?? null,
+          callStatus: data.callStatus ?? "followup",
+          leadStatus: data.leadStatus || "newlead",
+          userId: auth.id,
         }
       });
 
-      // compute KPIs using the same connection for consistency
-      const kpis = await computeKPIs(auth.user.orgId);
+      // Optionally compute KPIs if function exists
+      let kpis = undefined;
+      if (typeof computeKPIs === 'function') {
+        kpis = await computeKPIs(auth.id);
+      }
       return { lead, kpis };
     });
 
@@ -236,3 +194,4 @@ export async function POST(req: Request) {
     );
   }
 }
+

@@ -1,3 +1,57 @@
+/* ------------------------------------------------------------------ */
+/*                                 PATCH                              */
+/* ------------------------------------------------------------------ */
+
+export async function PATCH(req: Request) {
+  try {
+    const auth = getUserFromAuthHeader(req);
+    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    // Extract id from URL
+    const urlParts = req.url.split("/");
+    const id = urlParts[urlParts.length - 1];
+    if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+
+    const body = await req.json();
+    const updateData: any = {};
+    if (body.leadStatus !== undefined) updateData.leadStatus = body.leadStatus;
+    if (body.callStatus !== undefined) updateData.callStatus = body.callStatus;
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+    }
+
+    const updated = await prisma.lead.update({
+      where: { id },
+      data: updateData,
+    });
+    return NextResponse.json({ success: true, lead: updated });
+  } catch (err: any) {
+    console.error("Update lead failed:", err);
+    return NextResponse.json({ error: err?.message ?? "Failed to update lead" }, { status: 400 });
+  }
+}
+/* ------------------------------------------------------------------ */
+/*                                 DELETE                              */
+/* ------------------------------------------------------------------ */
+
+export async function DELETE(req: Request) {
+  try {
+    const auth = getUserFromAuthHeader(req);
+    if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    // Extract id from URL
+    const urlParts = req.url.split("/");
+    const id = urlParts[urlParts.length - 1];
+    if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+
+    // Delete the lead and all related call logs (onDelete: Cascade in schema)
+    await prisma.lead.delete({ where: { id } });
+    return NextResponse.json({ success: true });
+  } catch (err: any) {
+    console.error("Delete lead failed:", err);
+    return NextResponse.json({ error: err?.message ?? "Failed to delete lead" }, { status: 400 });
+  }
+}
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUserFromAuthHeader } from "@/utils/auth";
@@ -110,67 +164,24 @@ export async function GET(req: Request) {
     const auth = getUserFromAuthHeader(req);
     if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const url = new URL(req.url);
-    const parsed = listQuerySchema.parse(Object.fromEntries(url.searchParams));
-    const { page, pageSize, q, dateFrom, dateTo, sort, order, includeKpis } = parsed;
+    // Extract id from URL
+    const urlParts = req.url.split("/");
+    const id = urlParts[urlParts.length - 1];
+    if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
-    const where: any = { userId: auth.id };
-
-    if (q && q.trim().length) {
-      where.OR = [
-        { name: { contains: q, mode: "insensitive" } },
-        { email: { contains: q, mode: "insensitive" } },
-        { phone: { contains: q, mode: "insensitive" } },
-        { city: { contains: q, mode: "insensitive" } },
-        { state: { contains: q, mode: "insensitive" } },
-        { company: { contains: q, mode: "insensitive" } },
-      ];
-    }
-
-    if (dateFrom || dateTo) {
-      const fromUtc =
-        dateFrom && !Number.isNaN(new Date(dateFrom).getTime())
-          ? toUtcFromIst(startOfIstDay(new Date(dateFrom)))
-          : undefined;
-      const toUtcVal =
-        dateTo && !Number.isNaN(new Date(dateTo).getTime())
-          ? toUtcFromIst(endOfIstDay(new Date(dateTo)))
-          : undefined;
-
-      if (fromUtc || toUtcVal) {
-        where.createdAt = { ...(fromUtc ? { gte: fromUtc } : {}), ...(toUtcVal ? { lte: toUtcVal } : {}) };
-      }
-    }
-
-    const skip = (page - 1) * pageSize;
-    const sortKey = sort === "name" ? "name" : "createdAt";
-    const sortOrder: "asc" | "desc" = order === "asc" ? "asc" : "desc";
-
-    const [items, total] = await Promise.all([
-      prisma.lead.findMany({
-        where,
-        skip,
-        take: pageSize,
-        orderBy: { [sortKey]: sortOrder },
-        select: {
-          id: true, name: true, email: true, phone: true,
-          city: true, state: true, company: true, createdAt: true,
+    const lead = await prisma.lead.findUnique({
+      where: { id },
+      include: {
+        callLogs: {
+          orderBy: { date: 'desc' },
         },
-      }),
-      prisma.lead.count({ where }),
-    ]);
-
-    const response: any = {
-      data: items,
-      pageInfo: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
-    };
-
-    if (includeKpis) response.kpis = await computeKPIs(auth.id);
-
-    return NextResponse.json(response);
+      },
+    });
+    if (!lead) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
+    return NextResponse.json(lead);
   } catch (err: any) {
-    console.error("List leads failed:", err);
-    return NextResponse.json({ error: err?.message ?? "Failed to list leads" }, { status: 400 });
+    console.error("Get lead failed:", err);
+    return NextResponse.json({ error: err?.message ?? "Failed to get lead" }, { status: 400 });
   }
 }
 

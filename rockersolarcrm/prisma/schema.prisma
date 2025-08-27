@@ -51,7 +51,10 @@ model Lead {
   roofType               String?
   propertyType           String?
 
+
   // Lead info
+  leadStatus             String   @default("newlead") // newlead, inprocess, sitevisits, estimatesent, leadwon, etc.
+  callStatus             String   @default("followup") // followup, overdue, upcoming
   leadSource             String?
   budget                 String?
   timeline               String?
@@ -72,6 +75,9 @@ model Lead {
   @@index([userId, city])
   @@index([userId, company])
 
+  // Call logs
+  callLogs               CallLog[]
+
 }
 
 
@@ -85,6 +91,18 @@ model Dashboard {
   wonCount         Int      @default(0)
   newLeads         Int      @default(0)  // Add this field
   lastCalculatedAt DateTime @default(now())
+}
+
+
+model CallLog {
+  id          String   @id @default(cuid())
+  leadId      String
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  date        DateTime
+  duration    Int      // duration in minutes
+  notes       String
+  action      String?  // e.g. 'Follow-up scheduled', 'Information sent via email'
+  createdAt   DateTime @default(now())
 }
 
 

@@ -5,42 +5,34 @@ import type React from "react"
 import { useState } from "react"
 import { X, Calendar, Clock, FileText } from "lucide-react"
 
-interface CallLog {
-  id: string
-  date: string
-  time: string
-  duration: string
-  notes: string
-  outcome: string
-}
+
 
 interface AddCallLogModalProps {
-  isOpen: boolean
-  onClose: () => void
-  onSave: (callLog: CallLog) => void
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (log: { date: string; duration: number; notes: string; action?: string | null }) => void;
 }
 
 export default function AddCallLogModal({ isOpen, onClose, onSave }: AddCallLogModalProps) {
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split("T")[0],
-    time: new Date().toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" }),
+    time: new Date().toTimeString().slice(0,5),
     duration: "",
     notes: "",
     outcome: "",
   })
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    const newCallLog: CallLog = {
-      id: Date.now().toString(),
-      date: formData.date,
-      time: formData.time,
-      duration: formData.duration,
+    e.preventDefault();
+    // Combine date and time into ISO string
+    const dateTime = new Date(`${formData.date}T${formData.time}`);
+    onSave({
+      date: dateTime.toISOString(),
+      duration: Number(formData.duration),
       notes: formData.notes,
-      outcome: formData.outcome,
-    }
-    onSave(newCallLog)
-  }
+      action: formData.outcome || undefined,
+    });
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({
@@ -129,17 +121,18 @@ export default function AddCallLogModal({ isOpen, onClose, onSave }: AddCallLogM
               Duration
             </label>
             <input
-              type="text"
+              type="number"
               name="duration"
               value={formData.duration}
               onChange={handleInputChange}
-              placeholder="e.g., 15 mins"
+              placeholder="Duration in minutes"
               className="w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 transition-all"
               style={{
                 backgroundColor: "#FFFFFF",
                 borderColor: "#D9D9D9",
                 color: "#1F1F1E",
               }}
+              min={1}
               required
             />
           </div>

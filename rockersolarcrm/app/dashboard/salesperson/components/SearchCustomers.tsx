@@ -1,26 +1,38 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Input, Select, Option } from "@material-tailwind/react"; // Updated to use Select component for KPIs
+import { Input, Select, Option } from "@material-tailwind/react";
 import { useRouter } from "next/navigation";
+
+type Props = {
+  isOpen: boolean;
+  onClose: () => void;
+};
+
+type Customer = {
+  id: string;
+  name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+};
 
 export default function SearchCustomers({ isOpen, onClose }: Props) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [filteredCustomers, setFilteredCustomers] = useState<any[]>([]);
-  const [selectedKPI, setSelectedKPI] = useState("New Lead"); // Default KPI
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [filteredCustomers, setFilteredCustomers] = useState<Customer[]>([]);
+  const [selectedKPI, setSelectedKPI] = useState("New Lead");
   const [error, setError] = useState<string>("");
 
-  // Fetching customer data from API based on KPI
   const fetchCustomers = async (kpi: string) => {
     try {
-      const response = await fetch(`/api/leads?status=${kpi}`);
+      const response = await fetch(`/api/leads?status=${encodeURIComponent(kpi)}`);
       const data = await response.json();
       if (response.ok) {
-        setCustomers(data);
+        setCustomers(data ?? []);
+        setError("");
       } else {
-        setError("Failed to fetch leads");
+        setError(data?.message || "Failed to fetch leads");
       }
     } catch (err) {
       console.error("Error fetching customers:", err);
@@ -29,18 +41,17 @@ export default function SearchCustomers({ isOpen, onClose }: Props) {
   };
 
   useEffect(() => {
-    fetchCustomers(selectedKPI); // Fetch leads when the KPI changes
+    fetchCustomers(selectedKPI);
   }, [selectedKPI]);
 
   useEffect(() => {
-    // Filter customers based on name, email, or phone
-    if (searchQuery.length > 0) {
-      const result = customers.filter((customer) => {
-        return (
-          customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          customer.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          customer.phone.includes(searchQuery)
-        );
+    const q = searchQuery.trim().toLowerCase();
+    if (q.length) {
+      const result = customers.filter((c) => {
+        const name = (c.name ?? "").toLowerCase();
+        const email = (c.email ?? "").toLowerCase();
+        const phone = c.phone ?? "";
+        return name.includes(q) || email.includes(q) || phone.includes(searchQuery);
       });
       setFilteredCustomers(result);
     } else {
@@ -52,13 +63,12 @@ export default function SearchCustomers({ isOpen, onClose }: Props) {
     setSearchQuery(e.target.value);
   };
 
-  const handleKPIChange = (e: React.ChangeEvent<{ value: string }>) => {
-    setSelectedKPI(e.target.value); // Update the KPI and fetch filtered customers
+  // Material Tailwind Select passes the value directly, not an event
+  const handleKPIChange = (value: string | undefined) => {
+    if (value) setSelectedKPI(value);
   };
 
   const handleCustomerClick = (customerId: string) => {
-    // Handle click, redirect or open customer detail
-    console.log("Redirecting to customer:", customerId);
     router.push(`/dashboard/salesperson/customer/${customerId}`);
   };
 
@@ -66,19 +76,13 @@ export default function SearchCustomers({ isOpen, onClose }: Props) {
     try {
       const response = await fetch("/api/leads", {
         method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ leadId: customerId }),
       });
 
       if (response.ok) {
-        setCustomers((prevCustomers) =>
-          prevCustomers.filter((customer) => customer.id !== customerId)
-        );
-        setFilteredCustomers((prevFilteredCustomers) =>
-          prevFilteredCustomers.filter((customer) => customer.id !== customerId)
-        );
+        setCustomers((prev) => prev.filter((c) => c.id !== customerId));
+        setFilteredCustomers((prev) => prev.filter((c) => c.id !== customerId));
       } else {
         setError("Failed to delete lead");
       }
@@ -90,12 +94,10 @@ export default function SearchCustomers({ isOpen, onClose }: Props) {
 
   return (
     <div
-      className={`${
-        isOpen ? "block" : "hidden"
-      } fixed inset-0 bg-gray-800 bg-opacity-50 flex justify-center items-center`}
+      className={`${isOpen ? "block" : "hidden"} fixed inset-0 bg-gray-800 bg-opacity-50 flex justify-center items-center`}
     >
       <div
-        className="bg-white rounded-lg p-6 w-full max-w-md"
+        className="relative bg-white rounded-lg p-6 w-full max-w-md"
         style={{ maxHeight: "80vh", overflowY: "auto" }}
       >
         <button
@@ -104,36 +106,47 @@ export default function SearchCustomers({ isOpen, onClose }: Props) {
         >
           ✖
         </button>
+
         <h3 className="text-xl font-semibold text-center">Search Customers</h3>
 
-        {/* KPI Dropdown */}
-        <Select
-          label="Select KPI"
-          value={selectedKPI}
-          onChange={handleKPIChange}
-          className="mb-4"
-        >
-          <Option value="New Lead">New Lead</Option>
-          <Option value="Overdue">Overdue</Option>
-          <Option value="Follow Up">Follow Up</Option>
-          <Option value="Closed">Closed</Option>
-        </Select>
+        <div className="mt-4 space-y-4">
+          {/* KPI Dropdown */}
+          <Select
+            label="Select KPI"
+            value={selectedKPI}
+            onChange={handleKPIChange}
+            name="kpi"
+            id="kpi-select"
+            placeholder="Select KPI"
+            onResize={() => {}}
+            onResizeCapture={() => {}}
+            onPointerEnterCapture={() => {}}
+            onPointerLeaveCapture={() => {}}
+          >
+            <Option value="New Lead">New Lead</Option>
+            <Option value="Overdue">Overdue</Option>
+            <Option value="Follow Up">Follow Up</Option>
+            <Option value="Closed">Closed</Option>
+          </Select>
 
-        <Input
-          type="text"
-          value={searchQuery}
-          onChange={handleSearchChange}
-          label="Search by name, email, or phone"
-          fullWidth
-        />
+          <Input
+            type="text"
+            value={searchQuery}
+            onChange={handleSearchChange}
+            label="Search by name, email, or phone"
+            name="customer-search"
+            id="customer-search"
+            placeholder="Search by name, email, or phone"
+            crossOrigin="anonymous"
+            onResize={() => {}}
+            onResizeCapture={() => {}}
+            onPointerEnterCapture={() => {}}
+            onPointerLeaveCapture={() => {}}
+          />
+        </div>
 
         {error && (
-          <div
-            className="p-4 mt-4 rounded bg-red-100 text-red-500"
-            style={{ backgroundColor: "#FEE2E2" }}
-          >
-            {error}
-          </div>
+          <div className="p-4 mt-4 rounded bg-red-100 text-red-600">{error}</div>
         )}
 
         {filteredCustomers.length === 0 ? (
@@ -147,7 +160,7 @@ export default function SearchCustomers({ isOpen, onClose }: Props) {
                 onClick={() => handleCustomerClick(customer.id)}
               >
                 <span>
-                  {customer.name} - {customer.email} - {customer.phone}
+                  {(customer.name ?? "No Name")} - {(customer.email ?? "No Email")} - {(customer.phone ?? "No Phone")}
                 </span>
                 <div className="flex items-center gap-2">
                   <button

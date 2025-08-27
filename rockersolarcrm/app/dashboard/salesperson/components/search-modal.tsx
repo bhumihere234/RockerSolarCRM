@@ -43,17 +43,16 @@ export default function SearchModal({ isOpen, onClose }: Props) {
 
     try {
       const token = localStorage.getItem("token") || "";
-      const res = await fetch("/api/leads/search", {
-        method: "POST",
+      const url = `/api/leads/search?query=${encodeURIComponent(q)}`;
+      const res = await fetch(url, {
+        method: "GET",
         headers: {
-          "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ q }),
       });
       if (res.ok) {
         const payload = await res.json();
-        const items: Lead[] = Array.isArray(payload?.items) ? payload.items : [];
+        const items: Lead[] = Array.isArray(payload?.hits) ? payload.hits : [];
         setResults(items);
       } else {
         setErr("No customers found");
