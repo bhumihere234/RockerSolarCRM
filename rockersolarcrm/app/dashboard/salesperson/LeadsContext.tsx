@@ -15,6 +15,8 @@ export type Lead = {
   formSubmissionDate?: string | null;
   lastContactDate?: string | null;
   nextCallDate?: string | null;
+  nextFollowUpDate?: string | null;
+  siteVisitDate?: string | null;
   [key: string]: any;
 };
 

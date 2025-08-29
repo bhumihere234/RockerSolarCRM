@@ -62,6 +62,7 @@ function SalespersonDashboardInner() {
   const [todayAbsenceRequest, setTodayAbsenceRequest] = useState<any>(null);
   const { leads: customers, refreshLeads } = useLeads();
   const [kpiCounts, setKpiCounts] = useState({
+    total: 0,
     upcoming: 0,
     overdue: 0,
     followup: 0,
@@ -73,70 +74,61 @@ function SalespersonDashboardInner() {
   });
 
   useEffect(() => {
-    // Debug: log all leads fetched
-    console.log("[DEBUG] All leads fetched:", customers);
-    if (customers.length > 0) {
-      console.log("[DEBUG] First lead object:", customers[0]);
-    }
-
-    // Helper function to calculate days difference
-    function getDaysDifference(date1, date2 = new Date().toISOString().split("T")[0]) {
+    // Helper: get days between two dates (date1 - date2)
+    function getDaysDifference(date1: string, date2: string = new Date().toISOString().split("T")[0]): number {
       const d1 = new Date(date1);
       const d2 = new Date(date2);
-      const diffTime = d2.getTime() - d1.getTime();
+      const diffTime = d1.getTime() - d2.getTime();
       return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     }
 
-    // Helper function to determine call status based on dates and interactions
-    function determineCallStatus(customer) {
-      const today = new Date().toISOString().split("T")[0];
-      const daysSinceSubmission = getDaysDifference(customer.formSubmissionDate, today);
-      if (customer.nextCallDate) {
-        const daysToNextCall = getDaysDifference(today, customer.nextCallDate);
-        if (daysToNextCall > 0) return "upcoming";
-        if (daysToNextCall < 0) return "overdue";
+    // Determine call status based on nextFollowUpDate and today's date
+    // Three KPIs: total, upcoming (today), overdue
+    // Logic:
+    // - upcoming: nextFollowUpDate === today
+    // - overdue: nextFollowUpDate < today OR (no nextFollowUpDate and leadStatus !== 'leadwon')
+    // - total: all leads
+  function determineCallStatus(lead: any) {
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const nextFollowUp = lead.nextFollowUpDate ? new Date(lead.nextFollowUpDate) : null;
+      if (nextFollowUp) {
+        nextFollowUp.setHours(0,0,0,0);
+        if (nextFollowUp.getTime() === today.getTime()) {
+          return "upcoming";
+        } else if (nextFollowUp.getTime() < today.getTime()) {
+          return "overdue";
+        }
       }
-      if (!customer.lastContactDate && daysSinceSubmission > 2) {
-        return "overdue";
-      }
-      if (customer.lastContactDate) {
-        const daysSinceContact = getDaysDifference(customer.lastContactDate, today);
-        if (daysSinceContact > 7) return "overdue";
-      }
-      if (customer.followupRequested) {
-        return "followup";
-      }
-      if (customer.leadStatus === "newlead") {
-        return "followup";
-      }
+      // If no nextFollowUpDate and not won, treat as overdue
+      if (lead.leadStatus !== "leadwon") return "overdue";
       return "";
     }
 
-    // Map leads to include callStatus: use backend value if present, else fallback to calculated
     const leadsWithStatus = customers.map((lead) => {
       const leadStatus = lead.leadStatus || 'newlead';
-      const formSubmissionDate = lead.formSubmissionDate || lead.createdAt || new Date().toISOString().split('T')[0];
-      // Use backend callStatus if present, else fallback to calculated
-      const callStatus = lead.callStatus || determineCallStatus({ ...lead, leadStatus, formSubmissionDate });
+      const callStatus = determineCallStatus(lead);
       return {
         ...lead,
         leadStatus,
-        formSubmissionDate,
         callStatus,
       };
     });
 
-    // Only 'newlead' KPI should increase on new lead creation
+    // Site Visits KPI: count leads with siteVisitDate === today (date only)
+    const todayStr = new Date().toISOString().split("T")[0];
     setKpiCounts({
+      total: leadsWithStatus.length,
       newlead: leadsWithStatus.filter((c) => c.leadStatus === "newlead").length,
       inprocess: leadsWithStatus.filter((c) => c.leadStatus === "inprocess").length,
-      sitevisit: leadsWithStatus.filter((c) => c.leadStatus === "sitevisit").length,
+      sitevisit: leadsWithStatus.filter((c) => c.siteVisitDate && c.siteVisitDate.split("T")[0] === todayStr).length,
+      sitevisitcompleted: leadsWithStatus.filter((c) => c.leadStatus === "sitevisitcompleted").length,
       estimatesent: leadsWithStatus.filter((c) => c.leadStatus === "estimatesent").length,
       leadwon: leadsWithStatus.filter((c) => c.leadStatus === "leadwon").length,
-      // Call status KPIs only update if a lead matches their logic
-      followup: leadsWithStatus.filter((c) => c.callStatus === "followup").length,
+      leadlost: leadsWithStatus.filter((c) => c.leadStatus === "leadlost").length,
       upcoming: leadsWithStatus.filter((c) => c.callStatus === "upcoming").length,
       overdue: leadsWithStatus.filter((c) => c.callStatus === "overdue").length,
+      followup: 0,
     });
 
     const today = new Date().toISOString().split("T")[0];
@@ -162,20 +154,26 @@ function SalespersonDashboardInner() {
 
   const callStatusKPIs = [
     {
-      title: "Upcoming Calls",
-      value: kpiCounts.upcoming.toString(),
+      title: "Total Leads",
+      value: kpiCounts.total?.toString() ?? "0",
+      icon: Users,
+      color: "#3B82F6",
+      type: "total",
+    },
+    {
+      title: "Upcoming Calls (Today)",
+      value: kpiCounts.upcoming?.toString() ?? "0",
       icon: Calendar,
       color: "#059669",
       type: "upcoming",
     },
     {
       title: "Overdue Calls",
-      value: kpiCounts.overdue.toString(),
+      value: kpiCounts.overdue?.toString() ?? "0",
       icon: AlertCircle,
       color: "#DC2626",
       type: "overdue",
     },
-    { title: "Followup Calls", value: kpiCounts.followup.toString(), icon: Phone, color: "#F16336", type: "followup" },
   ];
 
   const progressKPIs = [
@@ -187,6 +185,12 @@ function SalespersonDashboardInner() {
       color: "#8B5CF6",
       type: "sitevisit",
     },
+    { title: "Site Visit Completed",
+      value: kpiCounts.sitevisitcompleted?.toString() ?? "0",
+      icon: CheckCircle,
+      color: "#22C55E",
+      type: "sitevisitcompleted",
+    },
     {
       title: "Estimate Sent",
       value: kpiCounts.estimatesent.toString(),
@@ -195,6 +199,7 @@ function SalespersonDashboardInner() {
       type: "estimatesent",
     },
     { title: "Lead Won", value: kpiCounts.leadwon.toString(), icon: CheckCircle, color: "#10B981", type: "leadwon" },
+    { title: "Lead Lost", value: kpiCounts.leadlost?.toString() ?? "0", icon: AlertCircle, color: "#DC2626", type: "leadlost" },
   ];
 
   const handleKPIClick = (type: string, title: string) => {
@@ -312,7 +317,7 @@ function SalespersonDashboardInner() {
         <div className="mb-8">
           <h2 className="text-2xl font-bold mb-6" style={{ color: "#F4F4F1" }}>
             Call Status
-            <span className="text-sm font-normal ml-2" style={{ color: "#888886" }}>(Auto-updated based on Google form submissions and interactions)</span>
+            <span className="text-sm font-normal ml-2" style={{ color: "#888886" }}>(Auto-updated based on next follow-up date)</span>
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {callStatusKPIs.map((kpi, index) => (

@@ -6,6 +6,7 @@ import { Trash2 } from "lucide-react";
 import AddCallLogModal from "./components/add-call-log-modal";
 import { useParams, useRouter } from "next/navigation";
 
+
 // Dropdown options (copied from customer-list-modal)
 const CALL_STATUS_OPTIONS = [
   { value: "upcoming", label: "Upcoming Calls" },
@@ -20,8 +21,18 @@ const LEAD_PROGRESS_OPTIONS = [
   { value: "leadwon", label: "Lead Won" },
 ];
 
+// Add CallLog type for call log state and modal
+type CallLog = {
+  id: string;
+  date: string | Date;
+  duration: number;
+  notes: string;
+  action?: string | null;
+};
+
 
 type Lead = {
+  id: string; // <-- Add this line for unique identifier
   // core
   name?: string | null;         // API field
   fullName?: string | null;     // older UI field
@@ -77,6 +88,10 @@ function fmtDate(d?: string | Date | null) {
 }
 
 export default function CustomerProfilePage() {
+  // Next follow-up date state
+  const [nextFollowUpDate, setNextFollowUpDate] = useState<string>("");
+  const [savingFollowUp, setSavingFollowUp] = useState(false);
+  const [followUpError, setFollowUpError] = useState("");
   // KPI Dropdown state and handlers
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [kpiSelection, setKpiSelection] = useState<{ callStatus?: string; leadStatus?: string }>({});
@@ -188,6 +203,7 @@ export default function CustomerProfilePage() {
         if (isMounted) {
           setLead(data);
           setCallLogs(Array.isArray(data.callLogs) ? data.callLogs : []);
+          setNextFollowUpDate(data.nextFollowUpDate ? new Date(data.nextFollowUpDate).toISOString().split("T")[0] : "");
         }
       } catch (e: any) {
         if (isMounted) setErr(e?.message || "Failed to load lead");
@@ -201,6 +217,44 @@ export default function CustomerProfilePage() {
       isMounted = false;
     };
   }, [id]);
+
+  // Save next follow-up date
+  const handleSaveFollowUpDate = async () => {
+    if (!nextFollowUpDate) {
+      setFollowUpError("Next follow-up date is required");
+      return;
+    }
+    setSavingFollowUp(true);
+    setFollowUpError("");
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      const res = await fetch(`/api/leads/${lead.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ nextFollowUpDate }),
+      });
+      if (!res.ok) throw new Error("Failed to update next follow-up date");
+      setFollowUpError("");
+      setLoading(true);
+      // reload lead
+      const reload = await fetch(`/api/leads/${lead.id}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        cache: "no-store",
+      });
+      if (reload.ok) {
+        const data = await reload.json();
+        setLead(data);
+      }
+    } catch (err) {
+      setFollowUpError("Failed to update next follow-up date. Please try again.");
+    } finally {
+      setSavingFollowUp(false);
+      setLoading(false);
+    }
+  };
 
   // determine saved state from localStorage whenever lead changes
   useEffect(() => {
@@ -418,7 +472,7 @@ export default function CustomerProfilePage() {
           <div className="space-y-1 text-base">
             <div><span className="opacity-60">Priority:</span> {fmt(lead?.priority)}</div>
             <div><span className="opacity-60">Lead Source:</span> {fmt(lead?.leadSource)}</div>
-            <div><span className="opacity-60">Next Follow-up:</span> {fmtDate(lead?.nextFollowUpDate)}</div>
+            {/* Next Follow-up moved to Add Call Log modal */}
             <div>
               <span className="opacity-60">Preferred Contact:</span> {[
                 fmt(lead?.preferredContactMethod),

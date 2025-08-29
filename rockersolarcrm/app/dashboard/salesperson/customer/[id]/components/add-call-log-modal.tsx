@@ -20,6 +20,7 @@ export default function AddCallLogModal({ isOpen, onClose, onSave }: AddCallLogM
     duration: "",
     notes: "",
     outcome: "",
+    nextFollowUpDate: "",
   })
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -31,6 +32,7 @@ export default function AddCallLogModal({ isOpen, onClose, onSave }: AddCallLogM
       duration: Number(formData.duration),
       notes: formData.notes,
       action: formData.outcome || undefined,
+      nextFollowUpDate: formData.nextFollowUpDate,
     });
   };
 
@@ -185,6 +187,22 @@ export default function AddCallLogModal({ isOpen, onClose, onSave }: AddCallLogM
               <option value="Call back later">Call back later</option>
               <option value="Deal closed">Deal closed</option>
             </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2" style={{ color: "#1F1F1E" }}>
+              Next Follow-up Date
+            </label>
+            <input
+              type="date"
+              name="nextFollowUpDate"
+              value={formData.nextFollowUpDate}
+              onChange={handleInputChange}
+              className="w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 transition-all"
+              style={{ backgroundColor: "#FFFFFF", borderColor: "#D9D9D9", color: "#1F1F1E" }}
+              min={new Date().toISOString().split('T')[0]}
+              required
+            />
           </div>
 
           <div className="flex space-x-4">

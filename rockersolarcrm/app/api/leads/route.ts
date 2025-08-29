@@ -105,6 +105,7 @@ export async function GET(req: Request) {
           createdAt: true,
           leadStatus: true,
           callStatus: true,
+          nextFollowUpDate: true,
         },
       }),
       prisma.lead.count({ where }),

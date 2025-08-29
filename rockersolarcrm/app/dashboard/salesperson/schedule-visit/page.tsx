@@ -150,26 +150,39 @@ export default function ScheduleSiteVisit() {
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsSubmitting(true)
+    e.preventDefault();
+    setIsSubmitting(true);
 
-    // Simulate API call
-    setTimeout(() => {
-      const siteVisit = {
-        id: Date.now().toString(),
-        ...formData,
-        createdDate: new Date().toISOString(),
-        createdBy: localStorage.getItem("userName") || "Sales Person",
-        status: "scheduled",
+    if (!selectedCustomer || !formData.visitDate) {
+      alert("Please select a customer and a visit date.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+      // Combine date and time into ISO string (if time provided)
+      let siteVisitDateISO = formData.visitDate;
+      if (formData.visitTime) {
+        siteVisitDateISO = new Date(`${formData.visitDate}T${formData.visitTime}`).toISOString();
       }
-
-      console.log("Site visit scheduled:", siteVisit)
-
-      setIsSubmitting(false)
-      alert("Site visit scheduled successfully! Customer will be notified.")
-      router.push("/dashboard/salesperson")
-    }, 2000)
-  }
+      const res = await fetch(`/api/leads/${selectedCustomer.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ siteVisitDate: siteVisitDateISO }),
+      });
+      if (!res.ok) throw new Error("Failed to schedule site visit");
+      setIsSubmitting(false);
+      alert("Site visit scheduled successfully! Customer will be notified.");
+      router.push("/dashboard/salesperson");
+    } catch (err) {
+      setIsSubmitting(false);
+      alert("Failed to schedule site visit. Please try again.");
+    }
+  } 
 
   const getMinDate = () => {
     const tomorrow = new Date()

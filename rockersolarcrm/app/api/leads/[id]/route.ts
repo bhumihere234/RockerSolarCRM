@@ -16,6 +16,16 @@ export async function PATCH(req: Request) {
     const updateData: any = {};
     if (body.leadStatus !== undefined) updateData.leadStatus = body.leadStatus;
     if (body.callStatus !== undefined) updateData.callStatus = body.callStatus;
+    if (body.nextFollowUpDate !== undefined) {
+      // Accept both string and Date, always store as Date
+      const dateVal = body.nextFollowUpDate ? new Date(body.nextFollowUpDate) : null;
+      updateData.nextFollowUpDate = dateVal;
+    }
+    if (body.siteVisitDate !== undefined) {
+      // Accept both string and Date, always store as Date
+      const dateVal = body.siteVisitDate ? new Date(body.siteVisitDate) : null;
+      updateData.siteVisitDate = dateVal;
+    }
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
@@ -79,6 +89,7 @@ const leadSchema = z.object({
   propertyType: z.string().optional().nullable(),
   leadSource: z.string().optional().nullable(),
   budget: z.coerce.number().optional().nullable(),
+  siteVisitDate: z.string().datetime().optional().nullable(),
 });
 
 const listQuerySchema = z.object({
@@ -217,6 +228,7 @@ export async function POST(req: Request) {
           propertyType: data.propertyType ?? null,
           leadSource: data.leadSource ?? null,
           budget: data.budget != null ? String(data.budget) : null,
+          siteVisitDate: data.siteVisitDate ? new Date(data.siteVisitDate) : null,
           userId: auth.id,
         },
       });

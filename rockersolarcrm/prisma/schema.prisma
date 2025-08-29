@@ -66,6 +66,9 @@ model Lead {
   preferredContactMethod String?  // "phone" | "whatsapp" | "email"
   nextFollowUpDate       DateTime?
 
+  // Site visit
+  siteVisitDate          DateTime?
+
   // Timestamps
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt

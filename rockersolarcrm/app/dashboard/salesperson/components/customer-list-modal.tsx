@@ -16,8 +16,10 @@ const LEAD_PROGRESS_OPTIONS = [
   { value: "newlead", label: "New Leads" },
   { value: "inprocess", label: "In Process" },
   { value: "sitevisit", label: "Site Visits" },
+  { value: "sitevisitcompleted", label: "Site Visit Completed" },
   { value: "estimatesent", label: "Estimate Sent" },
   { value: "leadwon", label: "Lead Won" },
+  { value: "leadlost", label: "Lead Lost" },
 ];
 
 interface Customer {
@@ -108,31 +110,22 @@ export default function CustomerListModal({ isOpen, onClose, kpiType, title }: C
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
   }
 
-  // Helper function to determine call status based on dates and interactions
-  const determineCallStatus = (customer: any) => {
-    const today = new Date().toISOString().split("T")[0]
-    const daysSinceSubmission = getDaysDifference(customer.formSubmissionDate, today)
-
-    // If there's a scheduled next call date
-    if (customer.nextCallDate) {
-      const daysToNextCall = getDaysDifference(today, customer.nextCallDate)
-      if (daysToNextCall > 0) return "upcoming"
-      if (daysToNextCall < 0) return "overdue"
+  // Use the exact same call status logic as the dashboard
+  const determineCallStatus = (lead: any) => {
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const nextFollowUp = lead.nextFollowUpDate ? new Date(lead.nextFollowUpDate) : null;
+    if (nextFollowUp) {
+      nextFollowUp.setHours(0,0,0,0);
+      if (nextFollowUp.getTime() === today.getTime()) {
+        return "upcoming";
+      } else if (nextFollowUp.getTime() < today.getTime()) {
+        return "overdue";
+      }
     }
-
-    // If no contact has been made and form was submitted more than 2 days ago
-    if (!customer.lastContactDate && daysSinceSubmission > 2) {
-      return "overdue"
-    }
-
-    // If last contact was more than 7 days ago
-    if (customer.lastContactDate) {
-      const daysSinceContact = getDaysDifference(customer.lastContactDate, today)
-      if (daysSinceContact > 7) return "overdue"
-    }
-
-    // Default to followup for new submissions or recent contacts
-    return "followup"
+    // If no nextFollowUpDate and not won, treat as overdue
+    if (lead.leadStatus !== "leadwon") return "overdue";
+    return "";
   }
 
 
@@ -210,8 +203,8 @@ export default function CustomerListModal({ isOpen, onClose, kpiType, title }: C
   const customersWithUpdatedStatus: Customer[] = leads.map((lead, idx) => {
     const leadStatus = lead.leadStatus || 'newlead';
     const formSubmissionDate = lead.formSubmissionDate || lead.createdAt || new Date().toISOString().split('T')[0];
-    // Use backend callStatus if present, else fallback to calculated
-    const callStatus = lead.callStatus || determineCallStatus({ ...lead, leadStatus, formSubmissionDate });
+    // Always recalculate callStatus using the synced logic
+    const callStatus = determineCallStatus(lead);
     let daysOverdue: number | undefined = undefined;
     if (callStatus === "overdue") {
       if (lead.lastContactDate) {
@@ -231,7 +224,7 @@ export default function CustomerListModal({ isOpen, onClose, kpiType, title }: C
       company: lead.company || "-",
       formSubmissionDate,
       lastContactDate: lead.lastContactDate || undefined,
-      nextCallDate: lead.nextCallDate || undefined,
+      nextCallDate: lead.nextFollowUpDate || lead.nextCallDate || undefined,
       salespersonNotes: lead.salespersonNotes || undefined,
       daysOverdue,
     };
@@ -240,6 +233,9 @@ export default function CustomerListModal({ isOpen, onClose, kpiType, title }: C
 
   // Filter customers based on KPI type
   const filteredCustomers = customersWithUpdatedStatus.filter((customer) => {
+    if (kpiType === "total" || !kpiType) {
+      return true; // Show all leads for Total Leads KPI
+    }
     if (kpiType === "followup" || kpiType === "overdue" || kpiType === "upcoming") {
       return customer.callStatus === kpiType;
     } else if (kpiType) {
