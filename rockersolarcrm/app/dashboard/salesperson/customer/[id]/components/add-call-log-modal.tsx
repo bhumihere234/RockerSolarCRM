@@ -32,7 +32,7 @@ export default function AddCallLogModal({ isOpen, onClose, onSave }: AddCallLogM
       duration: Number(formData.duration),
       notes: formData.notes,
       action: formData.outcome || undefined,
-      nextFollowUpDate: formData.nextFollowUpDate,
+      // nextFollowUpDate is not part of the expected type, so omit it
     });
   };
 

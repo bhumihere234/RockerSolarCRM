@@ -202,7 +202,15 @@ export default function CustomerListModal({ isOpen, onClose, kpiType, title }: C
   // Map leads to Customer type and add serialNo
   const customersWithUpdatedStatus: Customer[] = leads.map((lead, idx) => {
     const leadStatus = lead.leadStatus || 'newlead';
-    const formSubmissionDate = lead.formSubmissionDate || lead.createdAt || new Date().toISOString().split('T')[0];
+    // Ensure formSubmissionDate is always a string
+    let formSubmissionDate: string = '';
+    if (typeof lead.formSubmissionDate === 'string' && lead.formSubmissionDate) {
+      formSubmissionDate = lead.formSubmissionDate;
+    } else if (typeof lead.createdAt === 'string' && lead.createdAt) {
+      formSubmissionDate = lead.createdAt;
+    } else {
+      formSubmissionDate = new Date().toISOString().split('T')[0];
+    }
     // Always recalculate callStatus using the synced logic
     const callStatus = determineCallStatus(lead);
     let daysOverdue: number | undefined = undefined;
@@ -225,7 +233,7 @@ export default function CustomerListModal({ isOpen, onClose, kpiType, title }: C
       formSubmissionDate,
       lastContactDate: lead.lastContactDate || undefined,
       nextCallDate: lead.nextFollowUpDate || lead.nextCallDate || undefined,
-      salespersonNotes: lead.salespersonNotes || undefined,
+  salespersonNotes: typeof lead.salespersonNotes === 'string' ? lead.salespersonNotes : undefined,
       daysOverdue,
     };
   });
