@@ -151,7 +151,7 @@ export async function GET(req: Request) {
     }
 
     return NextResponse.json(base);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("List leads failed:", err);
     return NextResponse.json(
       { error: err?.message ?? "Failed to list leads" },

@@ -90,8 +90,6 @@ function fmtDate(d?: string | Date | null) {
 export default function CustomerProfilePage() {
   // Next follow-up date state
   const [nextFollowUpDate, setNextFollowUpDate] = useState<string>("");
-  const [savingFollowUp, setSavingFollowUp] = useState(false);
-  const [followUpError, setFollowUpError] = useState("");
   // KPI Dropdown state and handlers
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [kpiSelection, setKpiSelection] = useState<{ callStatus?: string; leadStatus?: string }>({});
@@ -218,43 +216,6 @@ export default function CustomerProfilePage() {
     };
   }, [id]);
 
-  // Save next follow-up date
-  const handleSaveFollowUpDate = async () => {
-    if (!nextFollowUpDate) {
-      setFollowUpError("Next follow-up date is required");
-      return;
-    }
-    setSavingFollowUp(true);
-    setFollowUpError("");
-    try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-      const res = await fetch(`/api/leads/${lead.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ nextFollowUpDate }),
-      });
-      if (!res.ok) throw new Error("Failed to update next follow-up date");
-      setFollowUpError("");
-      setLoading(true);
-      // reload lead
-      const reload = await fetch(`/api/leads/${lead.id}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        cache: "no-store",
-      });
-      if (reload.ok) {
-        const data = await reload.json();
-        setLead(data);
-      }
-    } catch (err) {
-      setFollowUpError("Failed to update next follow-up date. Please try again.");
-    } finally {
-      setSavingFollowUp(false);
-      setLoading(false);
-    }
-  };
 
   // determine saved state from localStorage whenever lead changes
   useEffect(() => {

@@ -17,7 +17,7 @@ export type Lead = {
   nextCallDate?: string | null;
   nextFollowUpDate?: string | null;
   siteVisitDate?: string | null;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 type LeadsContextType = {

@@ -59,6 +59,10 @@ export default function GeneralDashboard() {
               <Users size={20} className="mr-3" />
               Team
             </a>
+              {/* Example: <Link href='/somewhere'>Go</Link> */}
+              <Link href='/somewhere' className="flex items-center px-4 py-3 rounded-lg transition-colors">
+                Go
+              </Link>
           </div>
         </nav>
 

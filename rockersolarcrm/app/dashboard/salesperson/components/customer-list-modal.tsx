@@ -94,7 +94,7 @@ export default function CustomerListModal({ isOpen, onClose, kpiType, title }: C
       await refreshLeads();
       setDropdownOpenId(null);
       setKpiSelections(prev => ({ ...prev, [id]: { callStatus: "", leadStatus: "" } }));
-    } catch (err) {
+  } catch {
       alert("Failed to update KPI. Please try again.");
     } finally {
       setSavingKpiId(null);

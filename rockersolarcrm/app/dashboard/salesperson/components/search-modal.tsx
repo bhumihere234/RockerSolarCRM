@@ -34,7 +34,7 @@ export default function SearchModal({ isOpen, onClose }: Props) {
     }
   }, [isOpen]);
 
-  const normalizedQ = useMemo(() => q.trim().toLowerCase(), [q]);
+  // const normalizedQ = useMemo(() => q.trim().toLowerCase(), [q]);
 
   async function handleSearch(e?: React.FormEvent) {
     if (e) e.preventDefault();

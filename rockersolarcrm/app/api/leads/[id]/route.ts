@@ -13,7 +13,7 @@ export async function PATCH(req: Request) {
     if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
     const body = await req.json();
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     if (body.leadStatus !== undefined) updateData.leadStatus = body.leadStatus;
     if (body.callStatus !== undefined) updateData.callStatus = body.callStatus;
     if (body.nextFollowUpDate !== undefined) {
@@ -123,7 +123,7 @@ function istRangeForThisWeek() {
 }
 function istRangeForToday() {
   const istNow = nowIst();
-  return { start: toUtcFromIst(startOfIstDay(istNow)), end: toUtcFromIst(endOfIstDay(istNow)) };
+    return { start: toUtcFromIst(startOfIstDay(istNow)), end: toUtcFromIst(endOfIstDay(istNow)) };
 }
 
 /* ------------------------------------------------------------------ */

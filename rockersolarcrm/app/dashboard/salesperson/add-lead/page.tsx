@@ -88,9 +88,9 @@ function AddNewLeadInner() {
       setIsSubmitting(false);
       alert("Lead added successfully!");
       router.push("/dashboard/salesperson");
-    } catch (err: any) {
+  } catch (err: unknown) {
       setIsSubmitting(false);
-      alert(err.message || "Failed to add lead");
+  alert(typeof err === 'object' && err && 'message' in err ? (err as any).message : "Failed to add lead");
     }
   };
 
