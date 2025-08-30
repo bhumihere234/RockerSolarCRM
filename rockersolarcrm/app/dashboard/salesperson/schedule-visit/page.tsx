@@ -178,7 +178,7 @@ export default function ScheduleSiteVisit() {
       setIsSubmitting(false);
       alert("Site visit scheduled successfully! Customer will be notified.");
       router.push("/dashboard/salesperson");
-    } catch (err) {
+  } catch {
       setIsSubmitting(false);
       alert("Failed to schedule site visit. Please try again.");
     }

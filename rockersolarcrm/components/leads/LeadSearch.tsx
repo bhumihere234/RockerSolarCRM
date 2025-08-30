@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type SearchItem = {
@@ -94,7 +94,6 @@ export default function LeadSearch({
   }
 
   async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
     // If there is exactly one match, go directly; otherwise open dropdown
     if (items.length === 1) {
       navigateTo(items[0]);

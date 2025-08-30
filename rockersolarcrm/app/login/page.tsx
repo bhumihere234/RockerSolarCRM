@@ -76,11 +76,11 @@ export default function LoginPage() {
 
       // ✅ Always go to Salesperson Dashboard
       router.push("/dashboard/salesperson")
-    } catch (err: any) {
+  } catch (err) {
       setIsLoading(false)
       const newAttempts = loginAttempts + 1
       setLoginAttempts(newAttempts)
-      const msg = err?.message || "Login failed. Please try again."
+  const msg = typeof err === 'object' && err && 'message' in err ? (err as any).message : "Login failed. Please try again."
       if (newAttempts >= 3) {
         setIsAccountLocked(true)
         const until = Date.now() + 30000

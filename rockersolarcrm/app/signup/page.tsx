@@ -45,8 +45,8 @@ export default function SignupPage() {
         // 🔹 Default: main dashboard (not salesperson)
         router.push("/dashboard");
       }
-    } catch (err: any) {
-      alert(err.message || "Error creating account");
+  } catch (err) {
+  alert(typeof err === 'object' && err && 'message' in err ? (err as any).message : "Error creating account");
     } finally {
       setLoading(false);
     }

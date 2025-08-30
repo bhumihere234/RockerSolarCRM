@@ -20,37 +20,6 @@ import AbsenceModal from "./components/absence-modal";
 import SearchModal from "./components/search-modal";
 
 // Helper function to calculate days difference
-function getDaysDifference(date1: string, date2: string = new Date().toISOString().split("T")[0]) {
-  const d1 = new Date(date1);
-  const d2 = new Date(date2);
-  const diffTime = d2.getTime() - d1.getTime();
-  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-}
-
-// Helper function to determine call status based on dates and interactions
-function determineCallStatus(customer: any) {
-  const today = new Date().toISOString().split("T")[0];
-  const daysSinceSubmission = getDaysDifference(customer.formSubmissionDate, today);
-  if (customer.nextCallDate) {
-    const daysToNextCall = getDaysDifference(today, customer.nextCallDate);
-    if (daysToNextCall > 0) return "upcoming";
-    if (daysToNextCall < 0) return "overdue";
-  }
-  if (!customer.lastContactDate && daysSinceSubmission > 2) {
-    return "overdue";
-  }
-  if (customer.lastContactDate) {
-    const daysSinceContact = getDaysDifference(customer.lastContactDate, today);
-    if (daysSinceContact > 7) return "overdue";
-  }
-  if (customer.followupRequested) {
-    return "followup";
-  }
-  if (customer.leadStatus === "newlead") {
-    return "followup";
-  }
-  return "";
-}
 
 function SalespersonDashboardInner() {
   const router = useRouter();
@@ -59,7 +28,7 @@ function SalespersonDashboardInner() {
   const [showAbsenceModal, setShowAbsenceModal] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [attendanceStatus, setAttendanceStatus] = useState<"present" | "absent" | null>(null);
-  const [todayAbsenceRequest, setTodayAbsenceRequest] = useState<any>(null);
+  const [todayAbsenceRequest, setTodayAbsenceRequest] = useState<Record<string, unknown> | null>(null);
   const { leads: customers, refreshLeads } = useLeads();
   const [kpiCounts, setKpiCounts] = useState({
     total: 0,
@@ -69,8 +38,10 @@ function SalespersonDashboardInner() {
     newlead: 0,
     inprocess: 0,
     sitevisit: 0,
+    sitevisitcompleted: 0,
     estimatesent: 0,
     leadwon: 0,
+    leadlost: 0,
   });
 
   useEffect(() => {
@@ -88,7 +59,7 @@ function SalespersonDashboardInner() {
     // - upcoming: nextFollowUpDate === today
     // - overdue: nextFollowUpDate < today OR (no nextFollowUpDate and leadStatus !== 'leadwon')
     // - total: all leads
-  function determineCallStatus(lead: any) {
+  function determineCallStatus(lead: Record<string, any>) {
       const today = new Date();
       today.setHours(0,0,0,0);
       const nextFollowUp = lead.nextFollowUpDate ? new Date(lead.nextFollowUpDate) : null;
@@ -207,7 +178,7 @@ function SalespersonDashboardInner() {
     setShowCustomerList(true);
   };
 
-  const handleAbsenceSubmit = (absenceData: any) => {
+  const handleAbsenceSubmit = (absenceData: Record<string, unknown>) => {
     const today = new Date().toISOString().split("T")[0];
     const absenceRequest = {
       ...absenceData,
@@ -297,9 +268,9 @@ function SalespersonDashboardInner() {
                     <p style={{ color: "#DC2626" }}>❌ You are marked as absent today</p>
                     <div className="mt-2 p-3 rounded" style={{ backgroundColor: "#FEE2E2" }}>
                       <p className="text-sm font-medium" style={{ color: "#991B1B" }}>Absence Request Details:</p>
-                      <p className="text-sm" style={{ color: "#991B1B" }}>Type: {todayAbsenceRequest.type}</p>
-                      <p className="text-sm" style={{ color: "#991B1B" }}>Reason: {todayAbsenceRequest.reason}</p>
-                      <p className="text-sm" style={{ color: "#991B1B" }}>Status: {todayAbsenceRequest.status}</p>
+                      <p className="text-sm" style={{ color: "#991B1B" }}>Type: {String(todayAbsenceRequest.type)}</p>
+                      <p className="text-sm" style={{ color: "#991B1B" }}>Reason: {String(todayAbsenceRequest.reason)}</p>
+                      <p className="text-sm" style={{ color: "#991B1B" }}>Status: {String(todayAbsenceRequest.status)}</p>
                     </div>
                   </div>
                 ) : null}
