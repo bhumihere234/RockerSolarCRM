@@ -153,8 +153,12 @@ export async function GET(req: Request) {
     return NextResponse.json(base);
   } catch (err: unknown) {
     console.error("List leads failed:", err);
+    let errorMsg = "Failed to list leads";
+    if (typeof err === 'object' && err && 'message' in err) {
+      errorMsg = (err as any).message;
+    }
     return NextResponse.json(
-      { error: err?.message ?? "Failed to list leads" },
+      { error: errorMsg },
       { status: 400 }
     );
   }
