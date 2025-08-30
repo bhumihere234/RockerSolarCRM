@@ -1,5 +1,7 @@
+
+"use client";
+
 import Link from "next/link";
-"use client"
 
 import { useState, useEffect } from "react"
 import { BarChart3, Users, Settings, LogOut, Menu, X, Bell } from "lucide-react"
