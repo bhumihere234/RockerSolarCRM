@@ -79,14 +79,14 @@ export default function GeneralDashboard() {
               <Settings size={20} className="mr-3" />
               Settings
             </a>
-            <a
+            <Link
               href="/"
               className="flex items-center px-4 py-2 rounded-lg transition-colors hover:bg-gray-800"
               style={{ color: "#888886" }}
             >
               <LogOut size={20} className="mr-3" />
               Logout
-            </a>
+            </Link>
           </div>
         </div>
       </div>

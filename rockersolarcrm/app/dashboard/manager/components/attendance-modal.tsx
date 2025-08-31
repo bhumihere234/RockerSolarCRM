@@ -36,7 +36,7 @@ interface AttendanceModalProps {
 
 export default function AttendanceModal({ isOpen, onClose, teamMembers, attendanceStats }: AttendanceModalProps) {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0])
-  const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null)
+  // Removed unused selectedMember and setSelectedMember to fix lint error
 
   if (!isOpen) return null
 

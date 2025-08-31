@@ -33,15 +33,7 @@ interface ChartData {
   }[]
 }
 
-interface KPICard {
-  title: string
-  value: string
-  change: number
-  changeType: "increase" | "decrease"
-  icon: any
-  color: string
-  trend: number[]
-}
+// Removed unused KPICard interface to fix lint error
 
 export default function AnalyticsDashboard({ isOpen, onClose }: AnalyticsDashboardProps) {
   const [selectedTimeRange, setSelectedTimeRange] = useState<"7d" | "30d" | "90d" | "1y">("30d")
@@ -52,7 +44,7 @@ export default function AnalyticsDashboard({ isOpen, onClose }: AnalyticsDashboa
   )
 
   // Mock data that changes based on filters
-  const [dashboardData, setDashboardData] = useState({
+  const [dashboardData] = useState({
     kpis: [
       {
         title: "Total Revenue",

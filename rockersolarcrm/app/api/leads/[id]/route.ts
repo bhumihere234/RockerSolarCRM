@@ -35,9 +35,10 @@ export async function PATCH(req: Request) {
       data: updateData,
     });
     return NextResponse.json({ success: true, lead: updated });
-  } catch (err: any) {
-    console.error("Update lead failed:", err);
-    return NextResponse.json({ error: err?.message ?? "Failed to update lead" }, { status: 400 });
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    console.error("Update lead failed:", error);
+    return NextResponse.json({ error: error.message ?? "Failed to update lead" }, { status: 400 });
   }
 }
 /* ------------------------------------------------------------------ */
@@ -57,9 +58,10 @@ export async function DELETE(req: Request) {
     // Delete the lead and all related call logs (onDelete: Cascade in schema)
     await prisma.lead.delete({ where: { id } });
     return NextResponse.json({ success: true });
-  } catch (err: any) {
-    console.error("Delete lead failed:", err);
-    return NextResponse.json({ error: err?.message ?? "Failed to delete lead" }, { status: 400 });
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    console.error("Delete lead failed:", error);
+    return NextResponse.json({ error: error.message ?? "Failed to delete lead" }, { status: 400 });
   }
 }
 import { NextResponse } from "next/server";

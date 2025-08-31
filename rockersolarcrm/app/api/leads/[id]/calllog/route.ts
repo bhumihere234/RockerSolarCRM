@@ -28,8 +28,9 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       },
     });
     return NextResponse.json(callLog, { status: 201 });
-  } catch (err: any) {
-    console.error("Add call log failed:", err as unknown);
-    return NextResponse.json({ error: err?.message ?? "Failed to add call log" }, { status: 400 });
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err : new Error(String(err));
+    console.error("Add call log failed:", error);
+    return NextResponse.json({ error: error.message ?? "Failed to add call log" }, { status: 400 });
   }
 }

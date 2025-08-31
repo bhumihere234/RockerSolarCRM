@@ -1,3 +1,14 @@
+const listQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(200).default(20),
+  q: z.string().trim().optional(),
+  status: z.enum(["OPEN", "INPROCESS", "WON", "LOST"]).optional(),
+  dateFrom: z.string().datetime().optional(), // ISO string
+  dateTo: z.string().datetime().optional(),   // ISO string
+  sort: z.enum(["createdAt", "name"]).default("createdAt"),
+  order: z.enum(["asc", "desc"]).default("desc"),
+  includeKpis: z.coerce.boolean().default(false),
+});
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUserFromAuthHeader } from "@/utils/auth";
@@ -37,25 +48,7 @@ const leadSchema = z.object({
   siteVisitDate: z.string().optional().nullable(),
 });
 
-const listQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(200).default(20),
-  q: z.string().trim().optional(),
-  status: z.enum(["OPEN", "INPROCESS", "WON", "LOST"]).optional(),
-  dateFrom: z.string().datetime().optional(), // ISO string
-  dateTo: z.string().datetime().optional(),   // ISO string
-  sort: z.enum(["createdAt", "name"]).default("createdAt"),
-  order: z.enum(["asc", "desc"]).default("desc"),
-  includeKpis: z.coerce.boolean().default(false),
-});
-
-function istRangeForToday() {
-  const now = new Date();
-  const istNow = toZonedTime(now, IST);
-  const start = startOfDay(istNow);
-  const end = endOfDay(istNow);
-  return { start, end };
-}
+// Removed unused listQuerySchema and istRangeForToday to fix lint errors
 export async function GET(req: Request) {
   try {
     const auth = getUserFromAuthHeader(req);
@@ -67,7 +60,7 @@ export async function GET(req: Request) {
     const parsed = listQuerySchema.parse(Object.fromEntries(url.searchParams));
     const { page, pageSize, q, dateFrom, dateTo, sort, order, includeKpis } = parsed;
     const skip = (page - 1) * pageSize;
-    const where: any = { userId: auth.id };
+  const where: Record<string, unknown> = { userId: auth.id };
 
     // Search filter (case-insensitive)
     if (q && q.length > 0) {
