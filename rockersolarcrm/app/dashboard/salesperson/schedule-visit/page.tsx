@@ -50,59 +50,24 @@ export default function ScheduleSiteVisit() {
     notifyCustomer: true,
   })
 
-  // Mock customer data
-  const mockCustomers: Customer[] = [
-    {
-      id: "1",
-      name: "John Doe",
-      phone: "+91 9876543210",
-      email: "john.doe@email.com",
-      address: "123 Solar Street, Green Colony",
-      city: "Mumbai",
-      state: "Maharashtra",
-      company: "Tech Solutions Pvt Ltd",
-    },
-    {
-      id: "2",
-      name: "Jane Smith",
-      phone: "+91 9876543211",
-      email: "jane.smith@email.com",
-      address: "456 Energy Avenue, Eco Park",
-      city: "Pune",
-      state: "Maharashtra",
-      company: "Green Energy Corp",
-    },
-    {
-      id: "3",
-      name: "Mike Johnson",
-      phone: "+91 9876543212",
-      email: "mike.johnson@email.com",
-      address: "789 Power Lane, Solar City",
-      city: "Bangalore",
-      state: "Karnataka",
-      company: "Solar Innovations Ltd",
-    },
-    {
-      id: "4",
-      name: "Sarah Wilson",
-      phone: "+91 9876543213",
-      email: "sarah.wilson@email.com",
-      address: "321 Renewable Road, Clean Colony",
-      city: "Chennai",
-      state: "Tamil Nadu",
-      company: "Eco Solutions Inc",
-    },
-    {
-      id: "5",
-      name: "David Brown",
-      phone: "+91 9876543214",
-      email: "david.brown@email.com",
-      address: "654 Sustainable Street, Future Park",
-      city: "Hyderabad",
-      state: "Telangana",
-      company: "Renewable Tech Pvt Ltd",
-    },
-  ]
+  // Fetch real customers/leads from backend
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  useEffect(() => {
+    async function fetchCustomers() {
+      try {
+        const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+        const res = await fetch("/api/leads", {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!res.ok) throw new Error("Failed to fetch customers");
+  const data = await res.json();
+  setCustomers(Array.isArray(data.data) ? data.data : []);
+      } catch {
+        setCustomers([]);
+      }
+    }
+    fetchCustomers();
+  }, []);
 
   const visitTypes = [
     { value: "initial", label: "Initial Site Assessment" },
@@ -119,13 +84,13 @@ export default function ScheduleSiteVisit() {
     { value: "2days", label: "2 Days Before" },
   ]
 
-  const filteredCustomers = mockCustomers.filter(
+  const filteredCustomers = customers.filter(
     (customer) =>
-      customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.phone.includes(searchTerm) ||
-      customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.company.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+      customer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customer.phone?.includes(searchTerm) ||
+      customer.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customer.company?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target
@@ -162,27 +127,33 @@ export default function ScheduleSiteVisit() {
     try {
       const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
       // Combine date and time into ISO string (if time provided)
-      let siteVisitDateISO = formData.visitDate;
+      let nextSiteVisitDate = formData.visitDate;
       if (formData.visitTime) {
-        siteVisitDateISO = new Date(`${formData.visitDate}T${formData.visitTime}`).toISOString();
+        nextSiteVisitDate = new Date(`${formData.visitDate}T${formData.visitTime}`).toISOString();
       }
+      // Only send supported fields to backend
+      const payload: Record<string, unknown> = {
+        siteVisitDate: nextSiteVisitDate,
+      };
+      // Optionally, update leadStatus to 'sitevisit' if you want to mark KPI
+      // payload.leadStatus = 'sitevisit';
       const res = await fetch(`/api/leads/${selectedCustomer.id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ siteVisitDate: siteVisitDateISO }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error("Failed to schedule site visit");
       setIsSubmitting(false);
       alert("Site visit scheduled successfully! Customer will be notified.");
       router.push("/dashboard/salesperson");
-  } catch {
+    } catch {
       setIsSubmitting(false);
       alert("Failed to schedule site visit. Please try again.");
     }
-  } 
+  }
 
   const getMinDate = () => {
     const tomorrow = new Date()
@@ -238,12 +209,19 @@ export default function ScheduleSiteVisit() {
 
                 {!selectedCustomer ? (
                   <div>
-                    <div className="relative mb-4">
-                      <Search
-                        size={20}
-                        className="absolute left-3 top-1/2 transform -translate-y-1/2"
-                        style={{ color: "#888886" }}
-                      />
+                    <div className="relative mb-4 flex items-center">
+                      <button
+                        type="button"
+                        onClick={() => setShowCustomerSearch(true)}
+                        className="absolute left-3 top-1/2 transform -translate-y-1/2 z-10 p-0 m-0 bg-transparent border-none cursor-pointer"
+                        tabIndex={-1}
+                        aria-label="Search"
+                      >
+                        <Search
+                          size={20}
+                          style={{ color: "#888886" }}
+                        />
+                      </button>
                       <input
                         type="text"
                         value={searchTerm}

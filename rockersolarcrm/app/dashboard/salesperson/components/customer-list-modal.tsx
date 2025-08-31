@@ -34,6 +34,7 @@ interface Customer {
   formSubmissionDate: string
   lastContactDate?: string
   nextCallDate?: string
+  nextSiteVisitDate?: string
   salespersonNotes?: string
   daysOverdue?: number
 }
@@ -233,7 +234,10 @@ export default function CustomerListModal({ isOpen, onClose, kpiType, title }: C
       formSubmissionDate,
       lastContactDate: lead.lastContactDate || undefined,
       nextCallDate: lead.nextFollowUpDate || lead.nextCallDate || undefined,
-  salespersonNotes: typeof lead.salespersonNotes === 'string' ? lead.salespersonNotes : undefined,
+      nextSiteVisitDate: typeof lead.nextSiteVisitDate === 'string' && lead.nextSiteVisitDate
+        ? lead.nextSiteVisitDate
+        : (typeof lead.siteVisitDate === 'string' && lead.siteVisitDate ? lead.siteVisitDate : undefined),
+      salespersonNotes: typeof lead.salespersonNotes === 'string' ? lead.salespersonNotes : undefined,
       daysOverdue,
     };
   });
@@ -243,6 +247,17 @@ export default function CustomerListModal({ isOpen, onClose, kpiType, title }: C
   const filteredCustomers = customersWithUpdatedStatus.filter((customer) => {
     if (kpiType === "total" || !kpiType) {
       return true; // Show all leads for Total Leads KPI
+    }
+    if (kpiType === "sitevisit") {
+      // Only show leads whose nextSiteVisitDate is today
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const nextSiteVisit = customer.nextSiteVisitDate ? new Date(customer.nextSiteVisitDate) : null;
+      if (nextSiteVisit) {
+        nextSiteVisit.setHours(0,0,0,0);
+        return nextSiteVisit.getTime() === today.getTime();
+      }
+      return false;
     }
     if (kpiType === "upcoming") {
       // Only show calls scheduled for today
