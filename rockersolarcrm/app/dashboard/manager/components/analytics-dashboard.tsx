@@ -397,7 +397,13 @@ export default function AnalyticsDashboard({ isOpen, onClose }: AnalyticsDashboa
                     {["revenue", "leads", "calls", "customers"].map((metric) => (
                       <button
                         key={metric}
-                        onClick={() => setSelectedMetric(metric as any)}
+                        onClick={() => {
+                          // Only allow valid metric types
+                          const validMetrics = ["revenue", "leads", "calls", "customers"] as const;
+                          if (validMetrics.includes(metric as any)) {
+                            setSelectedMetric(metric as typeof validMetrics[number]);
+                          }
+                        }}
                         className={`px-3 py-1 rounded-lg text-sm font-medium transition-all ${
                           selectedMetric === metric ? "scale-105" : ""
                         }`}

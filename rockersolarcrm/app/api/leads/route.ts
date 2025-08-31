@@ -128,7 +128,7 @@ export async function GET(req: Request) {
       prisma.lead.count({ where }),
     ]);
 
-    const base: any = {
+  const base = {
       data: items,
       pageInfo: {
         page,
@@ -140,7 +140,7 @@ export async function GET(req: Request) {
 
     // Optionally add KPIs if requested and function exists
     if (includeKpis && typeof computeKPIs === 'function') {
-      base.kpis = await computeKPIs(auth.id);
+      (base as any).kpis = await computeKPIs(auth.id);
     }
 
     return NextResponse.json(base);
@@ -148,7 +148,7 @@ export async function GET(req: Request) {
     console.error("List leads failed:", err);
     let errorMsg = "Failed to list leads";
     if (typeof err === 'object' && err && 'message' in err) {
-      errorMsg = (err as any).message;
+      errorMsg = (err as { message?: string }).message ?? errorMsg;
     }
     return NextResponse.json(
       { error: errorMsg },
@@ -209,10 +209,14 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json(result, { status: 201 });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Create lead failed:", err);
+    let errorMsg = "Failed to create lead";
+    if (typeof err === 'object' && err && 'message' in err) {
+      errorMsg = (err as { message?: string }).message ?? errorMsg;
+    }
     return NextResponse.json(
-      { error: err?.message ?? "Failed to create lead" },
+      { error: errorMsg },
       { status: 400 }
     );
   }

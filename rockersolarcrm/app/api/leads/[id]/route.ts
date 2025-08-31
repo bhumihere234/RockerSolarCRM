@@ -154,7 +154,7 @@ export async function computeKPIs(userId?: string) {
 function normalizeStatus(s?: string): "OPEN" | "INPROCESS" | "WON" | "LOST" | undefined {
   if (!s) return undefined;
   const v = s.trim().toUpperCase();
-  if (["OPEN", "INPROCESS", "WON", "LOST"].includes(v)) return v as any;
+  if (["OPEN", "INPROCESS", "WON", "LOST"].includes(v)) return v as "OPEN" | "INPROCESS" | "WON" | "LOST";
   const map: Record<string, "OPEN"|"INPROCESS"|"WON"|"LOST"> = {
     "NEW LEAD": "OPEN",
     "OVERDUE": "INPROCESS",
@@ -189,9 +189,13 @@ export async function GET(req: Request) {
     });
     if (!lead) return NextResponse.json({ error: "Lead not found" }, { status: 404 });
     return NextResponse.json(lead);
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Get lead failed:", err);
-    return NextResponse.json({ error: err?.message ?? "Failed to get lead" }, { status: 400 });
+    let errorMsg = "Failed to get lead";
+    if (typeof err === "object" && err && "message" in err) {
+      errorMsg = (err as { message?: string }).message ?? errorMsg;
+    }
+    return NextResponse.json({ error: errorMsg }, { status: 400 });
   }
 }
 
@@ -237,8 +241,12 @@ export async function POST(req: Request) {
     });
 
     return NextResponse.json(result, { status: 201 });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Create lead failed:", err);
-    return NextResponse.json({ error: err?.message ?? "Failed to create lead" }, { status: 400 });
+    let errorMsg = "Failed to create lead";
+    if (typeof err === "object" && err && "message" in err) {
+      errorMsg = (err as { message?: string }).message ?? errorMsg;
+    }
+    return NextResponse.json({ error: errorMsg }, { status: 400 });
   }
 }

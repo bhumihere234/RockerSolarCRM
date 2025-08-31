@@ -203,8 +203,12 @@ export default function CustomerProfilePage() {
           setCallLogs(Array.isArray(data.callLogs) ? data.callLogs : []);
           setNextFollowUpDate(data.nextFollowUpDate ? new Date(data.nextFollowUpDate).toISOString().split("T")[0] : "");
         }
-      } catch (e: any) {
-        if (isMounted) setErr(e?.message || "Failed to load lead");
+  } catch (e: unknown) {
+        let msg = "Failed to load lead";
+        if (typeof e === 'object' && e && 'message' in e && typeof (e as { message?: string }).message === 'string') {
+          msg = (e as { message?: string }).message || msg;
+        }
+        if (isMounted) setErr(msg);
       } finally {
         if (isMounted) setLoading(false);
       }

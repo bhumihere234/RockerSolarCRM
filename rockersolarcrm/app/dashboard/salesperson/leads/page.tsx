@@ -82,7 +82,13 @@ export default function LeadsPage() {
     fetch(buildApiUrl())
       .then(async r => { if (!r.ok) throw new Error((await r.json())?.error || "Failed to fetch"); return r.json(); })
       .then((data: ApiResponse) => setResp(data))
-  .catch((e: unknown) => setErr(typeof e === 'object' && e && 'message' in e ? (e as any).message : "Failed to fetch"))
+  .catch((e: unknown) => {
+    let msg = "Failed to fetch";
+    if (typeof e === 'object' && e && 'message' in e && typeof (e as { message?: string }).message === 'string') {
+      msg = (e as { message?: string }).message || msg;
+    }
+    setErr(msg);
+  })
       .finally(() => setLoading(false));
   }, [buildApiUrl]);
 

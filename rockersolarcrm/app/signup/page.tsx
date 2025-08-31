@@ -46,7 +46,7 @@ export default function SignupPage() {
         router.push("/dashboard");
       }
   } catch (err) {
-  alert(typeof err === 'object' && err && 'message' in err ? (err as any).message : "Error creating account");
+  alert(typeof err === 'object' && err && 'message' in err ? (err as { message?: string }).message : "Error creating account");
     } finally {
       setLoading(false);
     }
