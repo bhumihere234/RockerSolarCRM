@@ -12,7 +12,6 @@ r.get("/users", async (req, res) => {
         name: true,
         email: true,
         phone: true,
-        role: true,
         createdAt: true,
         updatedAt: true,
       },

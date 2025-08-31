@@ -1,7 +1,6 @@
-import Vonage from "@vonage/server-sdk";
-import { config } from "dotenv";
 
-// Load environment variables from .env file
+import { Vonage } from '@vonage/server-sdk';
+import { config } from 'dotenv';
 config();
 
 const vonage = new Vonage({
@@ -9,15 +8,17 @@ const vonage = new Vonage({
   apiSecret: process.env.VONAGE_API_SECRET!,
 });
 
-const sendSms = (from: string, to: string, text: string) => {
-  // Corrected to use 'vonage.messages.sendSms'
-  vonage.messages.sendSms(from, to, text, (err: any, responseData: any) => { // Explicitly typed 'err' and 'responseData'
-    if (err) {
-      console.error("Error sending SMS:", err);
-    } else {
-      console.log("SMS sent successfully:", responseData);
-    }
-  });
+const sendSms = async (from: string, to: string, text: string) => {
+  try {
+    const resp = await vonage.sms.send({
+      to,
+      from,
+      text,
+    });
+    console.log('SMS sent successfully:', resp);
+  } catch (err) {
+    console.error('Error sending SMS:', err);
+  }
 };
 
 export { sendSms };
