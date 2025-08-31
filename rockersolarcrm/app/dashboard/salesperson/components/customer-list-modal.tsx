@@ -244,7 +244,29 @@ export default function CustomerListModal({ isOpen, onClose, kpiType, title }: C
     if (kpiType === "total" || !kpiType) {
       return true; // Show all leads for Total Leads KPI
     }
-    if (kpiType === "followup" || kpiType === "overdue" || kpiType === "upcoming") {
+    if (kpiType === "upcoming") {
+      // Only show calls scheduled for today
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const nextFollowUp = customer.nextCallDate ? new Date(customer.nextCallDate) : null;
+      if (nextFollowUp) {
+        nextFollowUp.setHours(0,0,0,0);
+        return nextFollowUp.getTime() === today.getTime();
+      }
+      return false;
+    }
+    if (kpiType === "overdue") {
+      // Only show calls where nextFollowUpDate is before today
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const nextFollowUp = customer.nextCallDate ? new Date(customer.nextCallDate) : null;
+      if (nextFollowUp) {
+        nextFollowUp.setHours(0,0,0,0);
+        return nextFollowUp.getTime() < today.getTime();
+      }
+      return false;
+    }
+    if (kpiType === "followup") {
       return customer.callStatus === kpiType;
     } else if (kpiType) {
       return customer.leadStatus === kpiType;

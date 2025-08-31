@@ -31,7 +31,7 @@ function AddNewLeadInner() {
     notes: "",
     preferredContactTime: "",
     preferredContactMethod: "",
-    nextFollowUpDate: "",
+  // nextFollowUpDate removed from main form, handled in call log only
     shadowFreeRooftop: "yes", // Default to "yes"
   })
 
@@ -67,7 +67,7 @@ function AddNewLeadInner() {
         notes: formData.notes,
         preferredContactTime: formData.preferredContactTime,
         preferredContactMethod: formData.preferredContactMethod,
-        nextFollowUpDate: formData.nextFollowUpDate,
+  // nextFollowUpDate is not part of the lead payload, handled in call log only
         leadStatus: "newlead",
       };
       const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -458,19 +458,7 @@ function AddNewLeadInner() {
                     placeholder="Enter preferred contact method"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2" style={{ color: "#1F1F1E" }}>
-                    Next Follow-up Date
-                  </label>
-                  <input
-                    type="date"
-                    name="nextFollowUpDate"
-                    value={formData.nextFollowUpDate}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 transition-all"
-                    style={{ backgroundColor: "#FFFFFF", borderColor: "#D9D9D9", color: "#1F1F1E" }}
-                  />
-                </div>
+                {/* Next Follow-up Date removed from main form, handled in call log modal only */}
                 <div>
                   <label className="block text-sm font-medium mb-2" style={{ color: "#1F1F1E" }}>
                     Notes
