@@ -137,17 +137,14 @@ export async function computeKPIs(userId?: string) {
   const { start: todayStart, end: todayEnd } = istRangeForToday();
   const { start: weekStart, end: weekEnd } = istRangeForThisWeek();
 
-  const [totalLeads, leadsToday, leadsThisWeek] = await Promise.all([
+  const [totalLeads, leadsToday, leadsThisWeek, leadLost] = await Promise.all([
     prisma.lead.count({ where: { ...whereUser } }),
     prisma.lead.count({ where: { ...whereUser, createdAt: { gte: todayStart, lte: todayEnd } } }),
     prisma.lead.count({ where: { ...whereUser, createdAt: { gte: weekStart, lte: weekEnd } } }),
+    prisma.lead.count({ where: { ...whereUser, leadStatus: "leadlost" } }),
   ]);
-  // No status field in schema, so skip openLeads/wonLeads
-  const openLeads = 0;
-  const wonLeads = 0;
-
-  const conversionRate = totalLeads === 0 ? 0 : Number(((wonLeads / totalLeads) * 100).toFixed(1));
-  return { totalLeads, leadsToday, leadsThisWeek, openLeads, wonLeads, conversionRate };
+  // You can add more KPIs here as needed
+  return { totalLeads, leadsToday, leadsThisWeek, leadLost };
 }
 
 /* ------------------------------------------------------------------ */
