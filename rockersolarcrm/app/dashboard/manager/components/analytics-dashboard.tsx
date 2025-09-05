@@ -22,16 +22,7 @@ interface AnalyticsDashboardProps {
   onClose: () => void
 }
 
-interface ChartData {
-  labels: string[]
-  datasets: {
-    label: string
-    data: number[]
-    backgroundColor: string
-    borderColor: string
-    borderWidth: number
-  }[]
-}
+// Removed unused ChartData interface to fix lint error
 
 // Removed unused KPICard interface to fix lint error
 

@@ -94,18 +94,7 @@ const leadSchema = z.object({
   siteVisitDate: z.string().datetime().optional().nullable(),
 });
 
-const listQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(200).default(20),
-  q: z.string().trim().optional(),
-  // accept any string; we'll normalize to enum later
-  status: z.string().optional(),
-  dateFrom: z.string().optional(),
-  dateTo: z.string().optional(),
-  sort: z.enum(["createdAt", "name"]).default("createdAt"),
-  order: z.enum(["asc", "desc"]).default("desc"),
-  includeKpis: z.coerce.boolean().default(false),
-});
+// Removed unused listQuerySchema
 
 /* ------------------------------------------------------------------ */
 /*                        Plain-JS IST Time Helpers                    */
@@ -151,19 +140,7 @@ export async function computeKPIs(userId?: string) {
 /*                             Normalizers                             */
 /* ------------------------------------------------------------------ */
 
-function normalizeStatus(s?: string): "OPEN" | "INPROCESS" | "WON" | "LOST" | undefined {
-  if (!s) return undefined;
-  const v = s.trim().toUpperCase();
-  if (["OPEN", "INPROCESS", "WON", "LOST"].includes(v)) return v as "OPEN" | "INPROCESS" | "WON" | "LOST";
-  const map: Record<string, "OPEN"|"INPROCESS"|"WON"|"LOST"> = {
-    "NEW LEAD": "OPEN",
-    "OVERDUE": "INPROCESS",
-    "FOLLOW UP": "INPROCESS",
-    "CLOSED": "WON", // change to "LOST" if that's how you use Closed
-    "LOST": "LOST",
-  };
-  return map[v];
-}
+// Removed unused normalizeStatus
 
 /* ------------------------------------------------------------------ */
 /*                                 GET                                 */

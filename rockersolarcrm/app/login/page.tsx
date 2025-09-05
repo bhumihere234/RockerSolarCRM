@@ -431,7 +431,7 @@ export default function LoginPage() {
         {!showForgotPassword && (
           <div className="text-center mt-8">
             <p style={{ color: "#888886" }}>
-              Don't have an account?{" "}
+              Don&apos;t have an account?&nbsp;
               <Link href="/signup" className="font-semibold hover:underline transition-colors" style={{ color: "#F16336" }}>
                 Sign up here
               </Link>

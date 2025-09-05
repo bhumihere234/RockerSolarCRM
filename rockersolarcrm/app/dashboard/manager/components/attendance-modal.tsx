@@ -319,7 +319,7 @@ export default function AttendanceModal({ isOpen, onClose, teamMembers, attendan
               </div>
               <div className="mt-4 text-center">
                 <p className="text-lg font-medium" style={{ color: "#1F1F1E" }}>
-                  Attendance Rate:{" "}
+                  Attendance Rate:&nbsp;
                   <span style={{ color: "#059669" }}>
                     {Math.round((attendanceStats.present / attendanceStats.total) * 100)}%
                   </span>
